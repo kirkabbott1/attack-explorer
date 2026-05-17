@@ -3,13 +3,34 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import type { GraphData, SearchIndex } from '@/lib/attack/types';
-import { AttackProvider } from '@/lib/attack/context';
+import { AttackProvider, useSelection } from '@/lib/attack/context';
 import AppShell from '@/components/attack/AppShell';
 import FilterSidebar from '@/components/attack/FilterSidebar';
+import DetailPanel from '@/components/attack/DetailPanel';
 
 // R3F (React Three Fiber) is client-only, so we disable SSR for the Scene component.
 // This prevents hydration errors since Three.js relies on browser APIs (WebGL, canvas).
 const Scene = dynamic(() => import('@/components/attack/Scene'), { ssr: false });
+
+/**
+ * Inner layout component that reads selection state from context.
+ * It must live inside AttackProvider so it can call useSelection() - which is
+ * why we cannot put this logic directly in AttackExplorerApp (the provider
+ * wraps ExplorerLayout, not the other way round).
+ * detailPanelOpen is derived from focusId so AppShell can animate the column width.
+ */
+function ExplorerLayout() {
+  // Read the current focus id from context to drive the panel open/closed state.
+  const [focusId] = useSelection();
+  return (
+    <AppShell
+      sidebar={<FilterSidebar />}
+      canvas={<Scene />}
+      detailPanel={<DetailPanel />}
+      detailPanelOpen={focusId !== null}
+    />
+  );
+}
 
 // Shape of the state once both JSON files have been fetched successfully.
 interface LoadedState {
@@ -71,15 +92,11 @@ export default function AttackExplorerApp() {
       )}
 
       {/* Loaded state: render the full 3D explorer. */}
+      {/* ExplorerLayout lives inside AttackProvider so it can call useSelection()
+          to derive detailPanelOpen and pass it to AppShell. */}
       {loaded && (
         <AttackProvider graph={loaded.graph} searchIndex={loaded.searchIndex}>
-          {/* AppShell manages the sidebar + canvas + detail panel layout. */}
-          <AppShell
-            sidebar={<FilterSidebar />}
-            canvas={<Scene />}
-            detailPanel={<div className="p-4 text-sm text-lightteal/60">Details panel coming in Phase 4...</div>}
-            detailPanelOpen={false}
-          />
+          <ExplorerLayout />
         </AttackProvider>
       )}
 
