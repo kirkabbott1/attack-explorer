@@ -12,6 +12,8 @@ import TacticsRow from './TacticsRow';
 // TechniqueField renders all parent techniques and sub-techniques as two InstancedMesh
 // objects (one draw call per type) for GPU-efficient rendering of 1000+ nodes.
 import TechniqueField from './TechniqueField';
+// GroupConstellation renders all threat groups as instanced octahedrons in the back-plane.
+import GroupConstellation from './GroupConstellation';
 
 /**
  * Top-level R3F canvas for the ATT&CK Explorer. Hosts camera, lights, orbit controls,
@@ -41,6 +43,8 @@ export default function Scene() {
       <TacticsRow />
       {/* TechniqueField: renders all parent techniques and sub-techniques as instanced meshes */}
       <TechniqueField />
+      {/* GroupConstellation: renders all threat groups as instanced octahedrons in the back-plane */}
+      <GroupConstellation />
     </Canvas>
   );
 }
