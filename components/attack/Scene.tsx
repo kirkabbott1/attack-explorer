@@ -8,6 +8,8 @@
 
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import { Perf } from 'r3f-perf';
+import { useRouter } from 'next/router';
 import TacticsRow from './TacticsRow';
 // TechniqueField renders all parent techniques and sub-techniques as two InstancedMesh
 // objects (one draw call per type) for GPU-efficient rendering of 1000+ nodes.
@@ -29,8 +31,13 @@ import HoverTooltip from './HoverTooltip';
  * and the subscenes for each entity type.
  *
  * Subscenes are added incrementally as Phase 3 lands. For now: tactics only.
+ *
+ * Supports ?debug=1 query parameter to render r3f-perf performance overlay.
  */
 export default function Scene() {
+  const router = useRouter();
+  const debug = router.query.debug === '1';
+
   return (
     // Canvas: creates the WebGL renderer and R3F scene graph.
     //   - camera starts pulled back (z=130) and elevated (y=30) to see the full tactics row
@@ -62,6 +69,9 @@ export default function Scene() {
       {/* HoverTooltip: floats a DOM label above the hovered node. One instance covers
           all node types — it returns null when nothing is hovered. */}
       <HoverTooltip />
+      {/* Perf: renders performance monitoring overlay in top-right when ?debug=1 is set.
+          Uses r3f-perf to display FPS, memory, and render stats. */}
+      {debug && <Perf position="top-right" />}
     </Canvas>
   );
 }
