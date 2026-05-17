@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useFilters, useGraph } from '@/lib/attack/context';
 import { EMPTY_FILTERS } from '@/lib/attack/types';
 import FilterSection from './FilterSection';
+import SearchBox from './SearchBox';
 
 /**
  * Left-hand sidebar containing four filter sections (Platform, Tactic, Group, Software)
@@ -68,6 +69,9 @@ export default function FilterSidebar() {
           ATT&amp;CK Explorer
         </h2>
       </div>
+
+      {/* Search box pinned directly below the brand header (Task 27) */}
+      <SearchBox />
 
       {/* Four filter sections — each renders chips for its option list */}
       <FilterSection
