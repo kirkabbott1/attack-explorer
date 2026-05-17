@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import type { GraphData, SearchIndex } from '@/lib/attack/types';
 import { AttackProvider } from '@/lib/attack/context';
 import AppShell from '@/components/attack/AppShell';
+import FilterSidebar from '@/components/attack/FilterSidebar';
 
 // R3F (React Three Fiber) is client-only, so we disable SSR for the Scene component.
 // This prevents hydration errors since Three.js relies on browser APIs (WebGL, canvas).
@@ -74,7 +75,7 @@ export default function AttackExplorerApp() {
         <AttackProvider graph={loaded.graph} searchIndex={loaded.searchIndex}>
           {/* AppShell manages the sidebar + canvas + detail panel layout. */}
           <AppShell
-            sidebar={<div className="p-4 text-sm text-lightteal/60">Filters coming in Phase 4...</div>}
+            sidebar={<FilterSidebar />}
             canvas={<Scene />}
             detailPanel={<div className="p-4 text-sm text-lightteal/60">Details panel coming in Phase 4...</div>}
             detailPanelOpen={false}
