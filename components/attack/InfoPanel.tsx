@@ -79,7 +79,10 @@ function ShapeIcon({ shape, color }: { shape: LegendItem['shape']; color: string
 }
 
 /**
- * InfoPanel renders as a fixed card at bottom-left of the viewport.
+ * InfoPanel renders as an absolutely-positioned card at bottom-right of the canvas area.
+ * Positioning is absolute (not fixed) so it is scoped to the <main> canvas column in
+ * AppShell. This keeps it from overlapping the detail panel (a separate aside column)
+ * when that panel slides open on the right, and from overlapping the sidebar on the left.
  * It always shows the legend and offers a toggle to reveal navigation controls.
  */
 export default function InfoPanel() {
@@ -88,7 +91,7 @@ export default function InfoPanel() {
 
   return (
     <div
-      className="hidden md:block fixed bottom-3 left-3 z-40 bg-darkblue/85 border border-darkteal/30 rounded px-3 py-2 text-xs"
+      className="hidden md:block absolute bottom-3 right-3 z-10 bg-darkblue/85 border border-darkteal/30 rounded px-3 py-2 text-xs"
       style={{ maxWidth: 260, backdropFilter: 'blur(4px)' }}
     >
       {/* Section label */}

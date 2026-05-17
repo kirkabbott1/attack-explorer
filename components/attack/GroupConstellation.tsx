@@ -122,8 +122,9 @@ export default function GroupConstellation() {
     >
       {/* Octahedron detail=0 gives the classic 8-face diamond shape, cheap to render */}
       <octahedronGeometry args={[GROUP_RADIUS, 0]} />
-      {/* meshStandardMaterial responds to scene lighting for depth cues */}
-      <meshStandardMaterial color={GROUP_COLOR} />
+      {/* meshBasicMaterial renders color flatly without lighting interaction — ensures
+          the rendered purple matches exactly the hex value shown in the InfoPanel legend. */}
+      <meshBasicMaterial color={GROUP_COLOR} />
     </instancedMesh>
   );
 }

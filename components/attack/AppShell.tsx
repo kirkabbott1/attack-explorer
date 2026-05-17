@@ -3,6 +3,10 @@ import { type ReactNode } from 'react';
 interface AppShellProps {
   sidebar: ReactNode;
   canvas: ReactNode;
+  /** Optional overlay elements rendered inside <main> (absolutely positioned).
+   *  Use this for controls like SidebarToggle and InfoPanel so they are scoped
+   *  to the canvas area and do not overlap the sidebar or detail panel. */
+  canvasOverlays?: ReactNode;
   detailPanel: ReactNode;
   detailPanelOpen: boolean;
   /** Controls whether the left filter sidebar is visible. When false, the aside
@@ -19,8 +23,13 @@ interface AppShellProps {
  *
  * Full-bleed: no Layout shell, no Navbar, no Footer. The explorer is a tool, not a piece
  * of content, and benefits from every pixel of available canvas.
+ *
+ * canvasOverlays are rendered inside <main> which has position:relative, so absolutely-
+ * positioned overlays (SidebarToggle, InfoPanel) are contained within the canvas column
+ * rather than being fixed to the viewport. This prevents them from overlapping the sidebar
+ * or detail panel when those panels are open.
  */
-export default function AppShell({ sidebar, canvas, detailPanel, detailPanelOpen, sidebarOpen }: AppShellProps) {
+export default function AppShell({ sidebar, canvas, canvasOverlays, detailPanel, detailPanelOpen, sidebarOpen }: AppShellProps) {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-darkblue text-lightteal">
       {/* Left sidebar: hidden on mobile (< 768px), collapsible on desktop via sidebarOpen.
@@ -39,6 +48,10 @@ export default function AppShell({ sidebar, canvas, detailPanel, detailPanelOpen
       </aside>
       <main className="flex-1 relative" aria-label="3D explorer canvas">
         {canvas}
+        {/* Canvas overlays (e.g. SidebarToggle, InfoPanel) are rendered here so they are
+            absolutely positioned within main and cannot overflow into the sidebar or detail
+            panel columns. main already has position:relative which anchors them correctly. */}
+        {canvasOverlays}
       </main>
       {/* Right detail panel: hidden on mobile (< 768px), slides in/out at md and up */}
       <aside

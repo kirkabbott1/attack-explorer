@@ -163,7 +163,9 @@ export default function TechniqueField() {
       {/*
         Parent technique instances.
         args = [geometry, material, count] — passing undefined for geometry and material
-        because they are defined via child JSX (<sphereGeometry> and <meshStandardMaterial>).
+        because they are defined via child JSX (<sphereGeometry> and <meshBasicMaterial>).
+        meshBasicMaterial renders colors flatly (no lighting interaction), which ensures
+        the rendered teal matches exactly the hex values shown in the InfoPanel legend.
         Pointer handlers enable hover tooltip and click-to-select.
       */}
       <instancedMesh
@@ -175,13 +177,15 @@ export default function TechniqueField() {
       >
         {/* Higher segment counts (12x12) keep parent spheres smooth at their larger radius. */}
         <sphereGeometry args={[TECHNIQUE_RADIUS, 12, 12]} />
-        <meshStandardMaterial color={TECHNIQUE_COLOR} />
+        <meshBasicMaterial color={TECHNIQUE_COLOR} />
       </instancedMesh>
 
       {/*
         Sub-technique instances.
         Smaller radius and slightly lower segment count (10x10) — still smooth at this size,
         and slightly cheaper to rasterise given the larger quantity of sub-technique nodes.
+        meshBasicMaterial used here for the same reason as parent techniques — flat color
+        rendering so legend colors match exactly what appears in the 3D scene.
         Pointer handlers enable hover tooltip and click-to-select.
       */}
       <instancedMesh
@@ -192,7 +196,7 @@ export default function TechniqueField() {
         onClick={onSubClick}
       >
         <sphereGeometry args={[SUBTECHNIQUE_RADIUS, 10, 10]} />
-        <meshStandardMaterial color={SUBTECHNIQUE_COLOR} />
+        <meshBasicMaterial color={SUBTECHNIQUE_COLOR} />
       </instancedMesh>
     </group>
   );

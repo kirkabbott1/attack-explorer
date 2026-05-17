@@ -160,8 +160,9 @@ export default function SoftwareConstellation() {
       >
         {/* Box with equal sides so it reads as a cube at any viewing angle */}
         <boxGeometry args={[SOFTWARE_SIZE, SOFTWARE_SIZE, SOFTWARE_SIZE]} />
-        {/* meshStandardMaterial responds to scene lighting for consistent depth cues */}
-        <meshStandardMaterial color={MALWARE_COLOR} />
+        {/* meshBasicMaterial renders color flatly without lighting interaction — ensures
+            the rendered orange matches exactly the hex value shown in the InfoPanel legend. */}
+        <meshBasicMaterial color={MALWARE_COLOR} />
       </instancedMesh>
 
       {/* Tools: tetrahedron geometry — one draw call for all tool instances.
@@ -175,7 +176,9 @@ export default function SoftwareConstellation() {
       >
         {/* Tetrahedron detail=0 gives the minimal 4-face pyramid, cheap and distinctive */}
         <tetrahedronGeometry args={[SOFTWARE_SIZE * 1.1, 0]} />
-        <meshStandardMaterial color={TOOL_COLOR} />
+        {/* meshBasicMaterial renders color flatly without lighting interaction — ensures
+            the rendered yellow matches exactly the hex value shown in the InfoPanel legend. */}
+        <meshBasicMaterial color={TOOL_COLOR} />
       </instancedMesh>
     </group>
   );

@@ -48,21 +48,25 @@ function ExplorerLayout() {
   return (
     <>
       {/* KeyboardShortcuts: registers global keydown listener for /, Cmd+K, and Esc.
-          Must live inside AttackProvider so it can call useSelection(). */}
+          Must live inside AttackProvider so it can call useSelection(). Renders no
+          visible UI, so it stays as a sibling of AppShell. */}
       <KeyboardShortcuts searchInputRef={searchInputRef} />
-
-      {/* SidebarToggle: fixed top-left button that collapses/expands the filter sidebar.
-          Positioned as a sibling of AppShell (not inside it) because it uses
-          position:fixed and must not be clipped by the AppShell flex container. */}
-      <SidebarToggle open={sidebarOpen} onToggle={() => setSidebarOpen(o => !o)} />
-
-      {/* InfoPanel: fixed bottom-left legend + expandable controls reference.
-          Also a fixed-position sibling of AppShell for the same reason. */}
-      <InfoPanel />
 
       <AppShell
         sidebar={<FilterSidebar searchInputRef={searchInputRef} />}
         canvas={<Scene />}
+        canvasOverlays={
+          <>
+            {/* SidebarToggle: absolutely positioned inside <main> (the canvas column) so
+                it sits at the left edge of the canvas area, not the left edge of the
+                viewport. This prevents it from overlapping the sidebar when it is open. */}
+            <SidebarToggle open={sidebarOpen} onToggle={() => setSidebarOpen(o => !o)} />
+
+            {/* InfoPanel: absolutely positioned inside <main> at bottom-right so it does
+                not overlap the sidebar (left) or the detail panel (right aside column). */}
+            <InfoPanel />
+          </>
+        }
         detailPanel={<DetailPanel />}
         detailPanelOpen={focusId !== null}
         sidebarOpen={sidebarOpen}

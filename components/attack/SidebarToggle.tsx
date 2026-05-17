@@ -1,10 +1,14 @@
 /**
- * SidebarToggle: a small fixed button anchored to the top-left of the viewport
- * (below the 3 px gap from the top edge). Clicking it calls onToggle to flip
- * the sidebarOpen state managed by ExplorerLayout in app.tsx.
+ * SidebarToggle: a small button anchored to the top-left of the canvas area.
+ * Clicking it calls onToggle to flip the sidebarOpen state managed by
+ * ExplorerLayout in app.tsx.
  *
- * Positioned at top-3 left-3 (z-50) — same z-index as the "Back to project"
- * link in the top-right, so neither overlaps the other.
+ * Positioned with absolute (not fixed) so it is scoped to the <main> canvas
+ * column inside AppShell. This prevents it from overlapping the sidebar when
+ * that panel is open — absolute top-3 left-3 places it at the left edge of
+ * the canvas, which is always to the right of the sidebar.
+ * z-10 is sufficient for viewport-scoped stacking; z-50 was only needed when
+ * the element was fixed to the full viewport.
  * Hidden on mobile (hidden md:flex) because the sidebar is already hidden on
  * small screens via AppShell's hidden md:block class on the aside element.
  */
@@ -23,7 +27,7 @@ export default function SidebarToggle({ open, onToggle }: Props) {
       onClick={onToggle}
       aria-label={open ? 'Hide filter sidebar' : 'Show filter sidebar'}
       aria-pressed={open}
-      className="hidden md:flex fixed top-3 left-3 z-50 items-center gap-1.5 px-2.5 py-1.5 text-xs bg-darkblue/85 hover:bg-darkblue text-medteal hover:text-lightteal border border-darkteal/40 rounded"
+      className="hidden md:flex absolute top-3 left-3 z-10 items-center gap-1.5 px-2.5 py-1.5 text-xs bg-darkblue/85 hover:bg-darkblue text-medteal hover:text-lightteal border border-darkteal/40 rounded"
       style={{ backdropFilter: 'blur(4px)' }}
     >
       {/* Angle-bracket chevron — ⟨ open, ⟩ closed — indicates sidebar direction.
