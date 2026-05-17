@@ -4,14 +4,23 @@ import { EMPTY_FILTERS } from '@/lib/attack/types';
 import FilterSection from './FilterSection';
 import SearchBox from './SearchBox';
 
+// Props accepted by FilterSidebar.
+// searchInputRef is forwarded to SearchBox so the parent can programmatically focus
+// the search input via keyboard shortcuts (/ and Cmd+K in KeyboardShortcuts.tsx).
+// React 19 types: useRef<T>(null) returns RefObject<T | null>, so we accept that here.
+interface FilterSidebarProps {
+  searchInputRef: React.RefObject<HTMLInputElement | null>;
+}
+
 /**
  * Left-hand sidebar containing four filter sections (Platform, Tactic, Group, Software)
  * and a "Clear all" link. Reads graph data from AttackProvider to derive options lists,
  * and reads/writes filter state via the useFilters hook.
  *
- * The search box (Task 27) will be inserted at the top of this component later.
+ * Accepts searchInputRef and passes it to SearchBox so the parent (app.tsx) can
+ * focus the search field via keyboard shortcuts without knowing the DOM internals.
  */
-export default function FilterSidebar() {
+export default function FilterSidebar({ searchInputRef }: FilterSidebarProps) {
   // DataLayer accessor — provides getAllTechniques, getAllTactics, etc.
   const data = useGraph();
   // Current filter selections and the setter from context.
@@ -70,8 +79,9 @@ export default function FilterSidebar() {
         </h2>
       </div>
 
-      {/* Search box pinned directly below the brand header (Task 27) */}
-      <SearchBox />
+      {/* Search box pinned directly below the brand header. The ref is passed through
+          so the parent can focus the input via keyboard shortcuts. */}
+      <SearchBox ref={searchInputRef} />
 
       {/* Four filter sections — each renders chips for its option list */}
       <FilterSection

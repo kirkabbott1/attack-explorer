@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createRef } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { AttackProvider } from '@/lib/attack/context';
@@ -12,10 +12,13 @@ const graph = fixture as GraphData;
 const searchIndex: SearchIndex = { entries: [] };
 
 // Helper: renders FilterSidebar wrapped in the AttackProvider so context hooks work.
+// Creates a ref for the search input and passes it as required by the updated prop type.
 function renderSidebar() {
+  // createRef<HTMLInputElement | null> matches FilterSidebarProps.searchInputRef type.
+  const ref = createRef<HTMLInputElement | null>();
   return render(
     <AttackProvider graph={graph} searchIndex={searchIndex}>
-      <FilterSidebar />
+      <FilterSidebar searchInputRef={ref} />
     </AttackProvider>
   );
 }

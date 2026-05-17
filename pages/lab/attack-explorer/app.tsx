@@ -2,13 +2,14 @@ import Head from 'next/head';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import type { GraphData, SearchIndex, FilterState } from '@/lib/attack/types';
 import { AttackProvider, useSelection } from '@/lib/attack/context';
 import { decodeStateFromQuery, encodeStateToQuery } from '@/lib/attack/url';
 import AppShell from '@/components/attack/AppShell';
 import FilterSidebar from '@/components/attack/FilterSidebar';
 import DetailPanel from '@/components/attack/DetailPanel';
+import KeyboardShortcuts from '@/components/attack/KeyboardShortcuts';
 
 // R3F (React Three Fiber) is client-only, so we disable SSR for the Scene component.
 // This prevents hydration errors since Three.js relies on browser APIs (WebGL, canvas).
@@ -20,17 +21,32 @@ const Scene = dynamic(() => import('@/components/attack/Scene'), { ssr: false })
  * why we cannot put this logic directly in AttackExplorerApp (the provider
  * wraps ExplorerLayout, not the other way round).
  * detailPanelOpen is derived from focusId so AppShell can animate the column width.
+ *
+ * Also creates the searchInputRef that is threaded through:
+ *   ExplorerLayout -> FilterSidebar -> SearchBox (ref lands on the <input>)
+ *   ExplorerLayout -> KeyboardShortcuts (reads the ref to call .focus())
  */
 function ExplorerLayout() {
   // Read the current focus id from context to drive the panel open/closed state.
   const [focusId] = useSelection();
+
+  // Ref pointing to the search input inside SearchBox. Passed to both FilterSidebar
+  // (to forward onto the input element) and KeyboardShortcuts (to call .focus()).
+  // React 19 types: useRef<T>(null) produces RefObject<T | null>.
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
   return (
-    <AppShell
-      sidebar={<FilterSidebar />}
-      canvas={<Scene />}
-      detailPanel={<DetailPanel />}
-      detailPanelOpen={focusId !== null}
-    />
+    <>
+      {/* KeyboardShortcuts: registers global keydown listener for /, Cmd+K, and Esc.
+          Must live inside AttackProvider so it can call useSelection(). */}
+      <KeyboardShortcuts searchInputRef={searchInputRef} />
+      <AppShell
+        sidebar={<FilterSidebar searchInputRef={searchInputRef} />}
+        canvas={<Scene />}
+        detailPanel={<DetailPanel />}
+        detailPanelOpen={focusId !== null}
+      />
+    </>
   );
 }
 

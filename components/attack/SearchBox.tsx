@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { forwardRef, useState, useMemo } from 'react';
 import { useSearchIndex, useSelection } from '@/lib/attack/context';
 import { search } from '@/lib/attack/search';
 
@@ -7,13 +7,17 @@ import { search } from '@/lib/attack/search';
  * (no debounce in v1 -- the index is small and search is fast). Clicking a result sets
  * the selection (which opens the detail panel and centers the camera).
  *
+ * Wrapped in forwardRef so a parent can pass a ref that lands on the inner <input>.
+ * The app page uses this ref to programmatically focus the input via keyboard shortcuts
+ * (/ and Cmd+K).
+ *
  * State:
  *   query  - raw text in the input field; drives the useMemo search call.
  *
  * When the user picks an entry the query is cleared so the listbox disappears and the
  * input is ready for the next search.
  */
-export default function SearchBox() {
+const SearchBox = forwardRef<HTMLInputElement>(function SearchBox(_, ref) {
   // Retrieve the search index from the nearest AttackProvider.
   const index = useSearchIndex();
   // setSelection maps to setFocusId in the context -- opening the detail panel.
@@ -36,10 +40,12 @@ export default function SearchBox() {
 
   return (
     <div className="px-4 py-3 border-b border-darkteal/30">
-      {/* Text input -- placeholder text must contain "search" for the test selector */}
+      {/* Text input: ref is forwarded from the parent so keyboard shortcuts can focus it.
+          Placeholder includes the / shortcut hint so users discover the shortcut. */}
       <input
+        ref={ref}
         type="text"
-        placeholder="Search techniques, groups, software..."
+        placeholder="Search techniques, groups, software... ( / )"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="w-full px-3 py-2 text-sm rounded bg-darkblue/60 text-lightteal placeholder-lightteal/40 border border-darkteal/40 focus:outline-none focus:border-medteal"
@@ -67,4 +73,6 @@ export default function SearchBox() {
       )}
     </div>
   );
-}
+});
+
+export default SearchBox;

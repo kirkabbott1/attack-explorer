@@ -25,6 +25,9 @@ import Edges from './Edges';
 // HoverTooltip renders a single floating HTML label next to whichever node is hovered.
 // One instance handles all node types — it reads hoveredId from context and repositions itself.
 import HoverTooltip from './HoverTooltip';
+// CameraFocus animates the camera target to the selected node when focusId changes.
+// Uses lerp over 400ms so the transition is smooth without being jarring.
+import CameraFocus from './CameraFocus';
 
 /**
  * Top-level R3F canvas for the ATT&CK Explorer. Hosts camera, lights, orbit controls,
@@ -69,6 +72,9 @@ export default function Scene() {
       {/* HoverTooltip: floats a DOM label above the hovered node. One instance covers
           all node types — it returns null when nothing is hovered. */}
       <HoverTooltip />
+      {/* CameraFocus: smoothly animates the camera target to the selected node position.
+          Runs a 400ms ease-out tween on focusId change. Returns null (no visual output). */}
+      <CameraFocus />
       {/* Perf: renders performance monitoring overlay in top-right when ?debug=1 is set.
           Uses r3f-perf to display FPS, memory, and render stats. */}
       {debug && <Perf position="top-right" />}
