@@ -1,14 +1,17 @@
 // Scene.tsx
 // Top-level React Three Fiber canvas for the ATT&CK 3D Explorer.
 // Sets up the R3F Canvas with camera, lighting, and orbit controls, then mounts
-// the subscene components. Additional subscenes (techniques, groups, software, edges)
+// the subscene components. Additional subscenes (groups, software, edges)
 // will be added incrementally as Phase 3 of the plan lands.
 //
-// Currently renders: tactics row only.
+// Currently renders: tactics row + technique/sub-technique instanced meshes.
 
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import TacticsRow from './TacticsRow';
+// TechniqueField renders all parent techniques and sub-techniques as two InstancedMesh
+// objects (one draw call per type) for GPU-efficient rendering of 1000+ nodes.
+import TechniqueField from './TechniqueField';
 
 /**
  * Top-level R3F canvas for the ATT&CK Explorer. Hosts camera, lights, orbit controls,
@@ -36,6 +39,8 @@ export default function Scene() {
       <OrbitControls enableDamping makeDefault />
       {/* TacticsRow: renders all 14 ATT&CK tactic hexagonal nodes with labels */}
       <TacticsRow />
+      {/* TechniqueField: renders all parent techniques and sub-techniques as instanced meshes */}
+      <TechniqueField />
     </Canvas>
   );
 }
