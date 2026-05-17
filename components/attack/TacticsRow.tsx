@@ -3,6 +3,7 @@
 // at the top of the 3D scene, with always-visible HTML labels below each node.
 // Reads position data from the AttackContext via usePositions and node data via useGraph.
 
+import { useEffect, useState } from 'react';
 import { Html } from '@react-three/drei';
 import { useGraph, usePositions } from '@/lib/attack/context';
 
@@ -14,6 +15,17 @@ const TACTIC_COLOR = '#3ffefb';
  * scene, with always-visible HTML labels below each.
  */
 export default function TacticsRow() {
+  // Track whether the viewport is wide enough to show HTML labels (>= 768px / Tailwind md).
+  // On mobile, Html overlays are hidden to keep the 3D canvas usable without clutter.
+  const [showLabels, setShowLabels] = useState(false);
+  useEffect(() => {
+    // Check and update label visibility whenever the window is resized.
+    const check = () => setShowLabels(typeof window !== 'undefined' && window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   // DataLayer accessor for querying all tactics from the loaded graph
   const data = useGraph();
   // Map from node ID to Vec3 world position computed by computeLayout
@@ -37,17 +49,20 @@ export default function TacticsRow() {
               {/* emissive matches base color so the disc glows even with low ambient light */}
               <meshStandardMaterial color={TACTIC_COLOR} emissive={TACTIC_COLOR} emissiveIntensity={0.4} />
             </mesh>
-            {/* HTML overlay: always faces the camera, scales with distance via distanceFactor */}
-            <Html
-              center
-              distanceFactor={120}
-              position={[0, -8, 0]}
-              style={{ pointerEvents: 'none', whiteSpace: 'nowrap' }}
-            >
-              <div style={{ color: '#9bfffd', fontSize: '14px', fontWeight: 600, textShadow: '0 0 4px #020818' }}>
-                {t.name}
-              </div>
-            </Html>
+            {/* HTML overlay: always faces the camera, scales with distance via distanceFactor.
+                Hidden on mobile (< 768px) to avoid overlay clutter on small viewports. */}
+            {showLabels && (
+              <Html
+                center
+                distanceFactor={120}
+                position={[0, -8, 0]}
+                style={{ pointerEvents: 'none', whiteSpace: 'nowrap' }}
+              >
+                <div style={{ color: '#9bfffd', fontSize: '14px', fontWeight: 600, textShadow: '0 0 4px #020818' }}>
+                  {t.name}
+                </div>
+              </Html>
+            )}
           </group>
         );
       })}

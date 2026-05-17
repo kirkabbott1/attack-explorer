@@ -5,6 +5,7 @@
 // hoveredId from context and repositions itself whenever that ID changes.
 // When hoveredId is null (no node hovered) the component returns null and renders nothing.
 
+import { useEffect, useState } from 'react';
 import { Html } from '@react-three/drei';
 import { useGraph, useHover, usePositions } from '@/lib/attack/context';
 
@@ -18,12 +19,26 @@ import { useGraph, useHover, usePositions } from '@/lib/attack/context';
  * which would interfere with onPointerOut on the underlying mesh.
  */
 export default function HoverTooltip() {
+  // Track whether the viewport is wide enough to show the HTML tooltip (>= 768px / Tailwind md).
+  // On mobile, hovering is not meaningful and Html overlays cause clutter, so return null early.
+  const [showLabels, setShowLabels] = useState(false);
+  useEffect(() => {
+    // Check and update visibility whenever the window is resized.
+    const check = () => setShowLabels(typeof window !== 'undefined' && window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   // DataLayer provides typed lookup methods for each entity category.
   const data = useGraph();
   // Map<nodeId, Vec3> — the world-space position for every node.
   const positions = usePositions();
   // [hoveredId, setHoveredId] — we only read hoveredId here.
   const [hoveredId] = useHover();
+
+  // On mobile viewports, suppress the tooltip entirely — orbit controls still work.
+  if (!showLabels) return null;
 
   // Nothing hovered: render nothing.
   if (!hoveredId) return null;
