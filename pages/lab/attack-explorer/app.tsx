@@ -10,6 +10,8 @@ import AppShell from '@/components/attack/AppShell';
 import FilterSidebar from '@/components/attack/FilterSidebar';
 import DetailPanel from '@/components/attack/DetailPanel';
 import KeyboardShortcuts from '@/components/attack/KeyboardShortcuts';
+import SidebarToggle from '@/components/attack/SidebarToggle';
+import InfoPanel from '@/components/attack/InfoPanel';
 
 // R3F (React Three Fiber) is client-only, so we disable SSR for the Scene component.
 // This prevents hydration errors since Three.js relies on browser APIs (WebGL, canvas).
@@ -25,6 +27,10 @@ const Scene = dynamic(() => import('@/components/attack/Scene'), { ssr: false })
  * Also creates the searchInputRef that is threaded through:
  *   ExplorerLayout -> FilterSidebar -> SearchBox (ref lands on the <input>)
  *   ExplorerLayout -> KeyboardShortcuts (reads the ref to call .focus())
+ *
+ * sidebarOpen state is managed here so SidebarToggle can flip it and AppShell
+ * can hide/show the left aside column accordingly. Defaults to open on desktop
+ * (the aside is already hidden on mobile via hidden md:block in AppShell).
  */
 function ExplorerLayout() {
   // Read the current focus id from context to drive the panel open/closed state.
@@ -35,16 +41,31 @@ function ExplorerLayout() {
   // React 19 types: useRef<T>(null) produces RefObject<T | null>.
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Whether the left filter sidebar is currently expanded. Toggled by SidebarToggle.
+  // Defaults to true (open) so desktop users see the filters on first load.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   return (
     <>
       {/* KeyboardShortcuts: registers global keydown listener for /, Cmd+K, and Esc.
           Must live inside AttackProvider so it can call useSelection(). */}
       <KeyboardShortcuts searchInputRef={searchInputRef} />
+
+      {/* SidebarToggle: fixed top-left button that collapses/expands the filter sidebar.
+          Positioned as a sibling of AppShell (not inside it) because it uses
+          position:fixed and must not be clipped by the AppShell flex container. */}
+      <SidebarToggle open={sidebarOpen} onToggle={() => setSidebarOpen(o => !o)} />
+
+      {/* InfoPanel: fixed bottom-left legend + expandable controls reference.
+          Also a fixed-position sibling of AppShell for the same reason. */}
+      <InfoPanel />
+
       <AppShell
         sidebar={<FilterSidebar searchInputRef={searchInputRef} />}
         canvas={<Scene />}
         detailPanel={<DetailPanel />}
         detailPanelOpen={focusId !== null}
+        sidebarOpen={sidebarOpen}
       />
     </>
   );
