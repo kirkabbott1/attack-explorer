@@ -121,7 +121,7 @@ export default function InfoPanel() {
       {expanded && (
         <div className="mt-2 pt-2 border-t border-darkteal/30 text-[12px] text-lightteal/80 space-y-2 leading-snug">
           <div>
-            <span className="text-medteal">Navigate:</span> drag to orbit; scroll to zoom; right-click to pan
+            <span className="text-medteal">Navigate:</span> drag to orbit; scroll to zoom; right-click or <code className="px-1 bg-darkteal/30 rounded">Shift</code> + drag to pan
           </div>
           <div>
             <span className="text-medteal">Search:</span> press{' '}

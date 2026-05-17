@@ -28,6 +28,9 @@ import HoverTooltip from './HoverTooltip';
 // CameraFocus animates the camera target to the selected node when focusId changes.
 // Uses lerp over 400ms so the transition is smooth without being jarring.
 import CameraFocus from './CameraFocus';
+// ShiftPanModifier: render-null component that wires Shift+drag as an alternate
+// pan binding by swapping OrbitControls.mouseButtons.LEFT on keydown/keyup.
+import ShiftPanModifier from './ShiftPanModifier';
 
 /**
  * Top-level R3F canvas for the ATT&CK Explorer. Hosts camera, lights, orbit controls,
@@ -75,6 +78,9 @@ export default function Scene() {
       {/* CameraFocus: smoothly animates the camera target to the selected node position.
           Runs a 400ms ease-out tween on focusId change. Returns null (no visual output). */}
       <CameraFocus />
+      {/* ShiftPanModifier: swaps OrbitControls left-drag mode to PAN while Shift is held,
+          restores ROTATE on keyup/blur. No visual output — side effects only. */}
+      <ShiftPanModifier />
       {/* Perf: renders performance monitoring overlay in top-right when ?debug=1 is set.
           Uses r3f-perf to display FPS, memory, and render stats. */}
       {debug && <Perf position="top-right" />}
