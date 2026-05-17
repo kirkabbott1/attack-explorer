@@ -91,11 +91,11 @@ export default function InfoPanel() {
 
   return (
     <div
-      className="hidden md:block absolute bottom-3 right-3 z-10 bg-darkblue/85 border border-darkteal/30 rounded px-3 py-2 text-xs"
-      style={{ maxWidth: 260, backdropFilter: 'blur(4px)' }}
+      className="hidden md:block absolute bottom-3 right-3 z-10 bg-darkblue/95 border border-darkteal/30 rounded px-4 py-3 text-sm"
+      style={{ maxWidth: 300, backdropFilter: 'blur(4px)' }}
     >
       {/* Section label */}
-      <div className="text-lightteal/60 uppercase tracking-wider text-[10px] mb-2">Legend</div>
+      <div className="text-lightteal/60 uppercase tracking-wider text-[11px] mb-2">Legend</div>
 
       {/* One row per node type */}
       <ul className="space-y-1">
@@ -111,7 +111,7 @@ export default function InfoPanel() {
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
-        className="mt-3 text-medteal hover:text-lightteal text-[11px] block"
+        className="mt-3 text-medteal hover:text-lightteal text-xs block"
       >
         {/* Use HTML entities for arrows to avoid Windows charmap encoding issues */}
         {expanded ? 'Hide controls ↑' : 'Controls & shortcuts ↓'}
@@ -119,7 +119,7 @@ export default function InfoPanel() {
 
       {/* Expandable controls/shortcuts reference — only mounted when open */}
       {expanded && (
-        <div className="mt-2 pt-2 border-t border-darkteal/30 text-[11px] text-lightteal/80 space-y-1.5 leading-snug">
+        <div className="mt-2 pt-2 border-t border-darkteal/30 text-[12px] text-lightteal/80 space-y-2 leading-snug">
           <div>
             <span className="text-medteal">Navigate:</span> drag to orbit; scroll to zoom; right-click to pan
           </div>

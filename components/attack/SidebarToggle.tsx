@@ -27,7 +27,7 @@ export default function SidebarToggle({ open, onToggle }: Props) {
       onClick={onToggle}
       aria-label={open ? 'Hide filter sidebar' : 'Show filter sidebar'}
       aria-pressed={open}
-      className="hidden md:flex absolute top-3 left-3 z-10 items-center gap-1.5 px-2.5 py-1.5 text-xs bg-darkblue/85 hover:bg-darkblue text-medteal hover:text-lightteal border border-darkteal/40 rounded"
+      className="hidden md:flex absolute top-3 left-3 z-10 items-center gap-1.5 px-3 py-2 text-sm bg-darkblue/95 hover:bg-darkblue text-medteal hover:text-lightteal border border-darkteal/40 rounded"
       style={{ backdropFilter: 'blur(4px)' }}
     >
       {/* Angle-bracket chevron — ⟨ open, ⟩ closed — indicates sidebar direction.

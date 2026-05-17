@@ -1,5 +1,4 @@
 import Head from 'next/head';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -12,6 +11,7 @@ import DetailPanel from '@/components/attack/DetailPanel';
 import KeyboardShortcuts from '@/components/attack/KeyboardShortcuts';
 import SidebarToggle from '@/components/attack/SidebarToggle';
 import InfoPanel from '@/components/attack/InfoPanel';
+import BackLink from '@/components/attack/BackLink';
 
 // R3F (React Three Fiber) is client-only, so we disable SSR for the Scene component.
 // This prevents hydration errors since Three.js relies on browser APIs (WebGL, canvas).
@@ -65,6 +65,11 @@ function ExplorerLayout() {
             {/* InfoPanel: absolutely positioned inside <main> at bottom-right so it does
                 not overlap the sidebar (left) or the detail panel (right aside column). */}
             <InfoPanel />
+
+            {/* BackLink: absolutely positioned inside <main> at top-right. Scoping it
+                here (not fixed to the viewport) ensures it never overlaps the detail
+                panel header — the panel is a separate aside column outside <main>. */}
+            <BackLink />
           </>
         }
         detailPanel={<DetailPanel />}
@@ -139,14 +144,6 @@ export default function AttackExplorerApp() {
         {/* Remove default body margin/padding and prevent scrollbars on the 3D canvas page. */}
         <style>{`html, body { margin: 0; padding: 0; overflow: hidden; }`}</style>
       </Head>
-
-      {/* Back-navigation link fixed to top-right, always above the 3D canvas (z-50). */}
-      <Link
-        href="/lab/attack-explorer"
-        className="fixed top-3 right-3 z-50 text-xs text-medteal hover:text-lightteal bg-darkblue/80 px-3 py-2 rounded border border-darkteal/40"
-      >
-        &larr; Back to project page
-      </Link>
 
       {/* Error state: data fetch failed. Shown instead of the canvas. */}
       {error && (
