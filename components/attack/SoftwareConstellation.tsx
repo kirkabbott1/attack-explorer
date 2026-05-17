@@ -4,11 +4,18 @@
 // Both types are positioned in the deepest back-plane by the computeLayout function.
 // Using two separate InstancedMeshes (one per shape) keeps each shape type as a single
 // GPU draw call while allowing distinct geometry per software category.
+//
+// Filter-aware rendering: when a software filter is active, only explicitly-selected
+// software entries render at full brightness; others are dimmed to ~8% brightness.
+// When no software filter is active, all entries render at full brightness.
+//
+// The useEffect runs on mount AND on every filter/position change — replaces the old
+// onUpdate-only setup so the scene updates reactively when the user changes filters.
 
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { InstancedMesh, Object3D, Color } from 'three';
-import { useGraph, usePositions } from '@/lib/attack/context';
-import type { Software } from '@/lib/attack/types';
+import { useGraph, usePositions, useFilters } from '@/lib/attack/context';
+import { isAnyFilterActive, softwareMatches } from '@/lib/attack/filter';
 
 // Orange distinguishes malware from purple groups and teal techniques.
 const MALWARE_COLOR = '#fb923c';
@@ -17,69 +24,86 @@ const TOOL_COLOR = '#facc15';
 // Base size for both shapes — slightly smaller than groups to indicate relative hierarchy.
 const SOFTWARE_SIZE = 1.0;
 
+// Scale factors: matching nodes scale up slightly when filters are active to draw the eye.
+const MATCH_SCALE = 1.2;
+const NONMATCH_SCALE = 1.0;
+
 /**
  * Renders all software (malware + tools) as two InstancedMeshes.
  * - Malware: box (cube) geometry in orange — common convention for destructive payloads.
  * - Tools: tetrahedron geometry in yellow — distinct angular silhouette for utility software.
  *
- * Both mesh types use R3F's onUpdate callback to write per-instance matrices and colors
- * once on mount. Nodes without a computed position (layout gap) are silently skipped.
+ * Uses useFilters() to reactively update node colors and scales whenever the filter state
+ * changes. Non-matching nodes are dimmed to near-black instead of removed so the overall
+ * constellation shape remains visible as spatial context.
  */
 export default function SoftwareConstellation() {
   // DataLayer exposes getAllSoftware() — returns the full software array from the graph.
   const data = useGraph();
   // Map<nodeId, Vec3> produced by computeLayout — positions every node in world space.
   const positions = usePositions();
+  // [filters, setFilters] — we only read filters here.
+  const [filters] = useFilters();
 
   // Split all software into malware and tools for separate instanced meshes.
   const all = data.getAllSoftware();
-  const malware = all.filter((s) => s.type === 'malware');
-  const tools = all.filter((s) => s.type === 'tool');
+  const malware = all.filter(s => s.type === 'malware');
+  const tools = all.filter(s => s.type === 'tool');
 
-  // Refs are kept for future imperative access (e.g. pointer-based interactions).
+  // Refs for direct imperative access in the useEffect update loop.
   const malwareMeshRef = useRef<InstancedMesh>(null!);
   const toolMeshRef = useRef<InstancedMesh>(null!);
 
-  /**
-   * setup() is called by R3F's onUpdate once an InstancedMesh is created.
-   * It writes a world-space transformation matrix and uniform color for each instance.
-   *
-   * @param mesh   - The InstancedMesh whose buffers to populate.
-   * @param items  - Subset of software items assigned to this mesh (malware or tools).
-   * @param color  - Hex color string applied uniformly to every instance in this mesh.
-   */
-  const setup = (mesh: InstancedMesh, items: Software[], color: string) => {
-    // Reusable dummy Object3D — avoids allocating one object per item in the loop.
-    const dummy = new Object3D();
-    const col = new Color(color);
+  // Runs on mount and whenever filters, positions, malware list, or tools list change.
+  // Updates every instance's matrix (position + scale) and color to reflect filter state.
+  useEffect(() => {
+    /**
+     * Updates all instances in a given mesh to reflect the current filter state.
+     * Matching nodes get full base color + MATCH_SCALE; non-matching get dim color + NONMATCH_SCALE.
+     *
+     * @param mesh         - The InstancedMesh to update (may be null before mount).
+     * @param items        - The subset of Software objects assigned to this mesh.
+     * @param baseColorHex - Full-brightness hex color for matching instances.
+     */
+    const update = (mesh: InstancedMesh | null, items: typeof all, baseColorHex: string) => {
+      if (!mesh) return;
+      const dummy = new Object3D();
+      const base = new Color(baseColorHex);
+      // ~8% intensity keeps non-matching nodes barely visible — perceptually near black.
+      const dim = new Color(baseColorHex).multiplyScalar(0.08);
+      const anyActive = isAnyFilterActive(filters);
 
-    for (let i = 0; i < items.length; i++) {
-      const pos = positions.get(items[i].id);
-      // Skip any software entry that the layout function did not assign a position to.
-      if (!pos) continue;
+      for (let i = 0; i < items.length; i++) {
+        const pos = positions.get(items[i].id);
+        // Skip any software entry that the layout function did not assign a position to.
+        if (!pos) continue;
 
-      dummy.position.set(pos.x, pos.y, pos.z);
-      dummy.updateMatrix();
+        // softwareMatches returns true for all entries when no software filter is active.
+        const matches = !anyActive || softwareMatches(items[i], filters);
 
-      // Write the 4x4 transformation matrix for this instance slot (position only).
-      mesh.setMatrixAt(i, dummy.matrix);
-      // setColorAt is optional on older Three.js builds — guard with optional call.
-      mesh.setColorAt?.(i, col);
-    }
+        dummy.position.set(pos.x, pos.y, pos.z);
+        dummy.scale.setScalar(matches ? MATCH_SCALE : NONMATCH_SCALE);
+        dummy.updateMatrix();
 
-    // Signal Three.js that the instance buffers have been written and need GPU upload.
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  };
+        // Write the 4x4 transformation matrix for this instance slot (position + scale).
+        mesh.setMatrixAt(i, dummy.matrix);
+        // Apply full or dimmed color based on match status.
+        mesh.setColorAt?.(i, matches ? base : dim);
+      }
+
+      // Signal Three.js that the instance buffers have been written and need GPU upload.
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    };
+
+    update(malwareMeshRef.current, malware, MALWARE_COLOR);
+    update(toolMeshRef.current, tools, TOOL_COLOR);
+  }, [filters, positions, malware, tools]);
 
   return (
     <group>
       {/* Malware: box (cube) geometry — one draw call for all malware instances */}
-      <instancedMesh
-        ref={malwareMeshRef}
-        args={[undefined, undefined, malware.length]}
-        onUpdate={(m) => setup(m as InstancedMesh, malware, MALWARE_COLOR)}
-      >
+      <instancedMesh ref={malwareMeshRef} args={[undefined, undefined, malware.length]}>
         {/* Box with equal sides so it reads as a cube at any viewing angle */}
         <boxGeometry args={[SOFTWARE_SIZE, SOFTWARE_SIZE, SOFTWARE_SIZE]} />
         {/* meshStandardMaterial responds to scene lighting for consistent depth cues */}
@@ -87,11 +111,7 @@ export default function SoftwareConstellation() {
       </instancedMesh>
 
       {/* Tools: tetrahedron geometry — one draw call for all tool instances */}
-      <instancedMesh
-        ref={toolMeshRef}
-        args={[undefined, undefined, tools.length]}
-        onUpdate={(m) => setup(m as InstancedMesh, tools, TOOL_COLOR)}
-      >
+      <instancedMesh ref={toolMeshRef} args={[undefined, undefined, tools.length]}>
         {/* Tetrahedron detail=0 gives the minimal 4-face pyramid, cheap and distinctive */}
         <tetrahedronGeometry args={[SOFTWARE_SIZE * 1.1, 0]} />
         <meshStandardMaterial color={TOOL_COLOR} />

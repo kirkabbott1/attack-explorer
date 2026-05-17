@@ -3,68 +3,89 @@
 // Using octahedrons (not spheres) makes groups visually distinct from technique nodes.
 // Groups are positioned at high +Z (back-plane) by the computeLayout function so they
 // cluster behind the technique field. One draw call for all groups = GPU-efficient.
+//
+// Filter-aware rendering: when a group filter is active, only the explicitly-selected
+// groups are shown at full color; all others are dimmed to ~8% brightness. When no
+// group filter is active, all groups render at full brightness.
+//
+// The useEffect runs on mount AND on every filter/position change — replaces the old
+// onUpdate-only setup so the scene updates reactively when the user changes filters.
 
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { InstancedMesh, Object3D, Color } from 'three';
-import { useGraph, usePositions } from '@/lib/attack/context';
+import { useGraph, usePositions, useFilters } from '@/lib/attack/context';
+import { isAnyFilterActive, groupMatches } from '@/lib/attack/filter';
 
-// Light purple differentiates groups from teal techniques and white/gold tactics.
+// Light purple differentiates groups from teal techniques and orange/yellow software.
 const GROUP_COLOR = '#c084fc';
 // Octahedron radius — slightly larger than technique spheres for visual hierarchy.
 const GROUP_RADIUS = 1.2;
+
+// Scale factors: matching nodes scale up slightly when filters are active to draw the eye.
+const MATCH_SCALE = 1.2;
+const NONMATCH_SCALE = 1.0;
 
 /**
  * Renders all threat groups as one InstancedMesh of octahedrons (visually distinct from
  * spherical techniques). Positioned in the back-plane (high +Z) per the layout function.
  *
- * Uses R3F's onUpdate callback to set per-instance matrices and colors once on mount.
- * If a group has no computed position (layout gap), it is silently skipped.
+ * Uses useFilters() to reactively update node colors and scales whenever filter state
+ * changes. Nodes that don't match the active filters are dimmed to near-black rather
+ * than removed, so the overall constellation shape remains visible as context.
  */
 export default function GroupConstellation() {
   // DataLayer exposes getAllGroups() — returns the full groups array from the graph.
   const data = useGraph();
   // Map<nodeId, Vec3> produced by computeLayout — positions every node in world space.
   const positions = usePositions();
+  // [filters, setFilters] — we only read filters here.
+  const [filters] = useFilters();
+
   const groups = data.getAllGroups();
-  // meshRef is used for direct imperative access if needed by future interaction code.
+
+  // meshRef is used for direct imperative access in the useEffect update loop.
   const meshRef = useRef<InstancedMesh>(null!);
 
-  /**
-   * setup() is called by R3F's onUpdate once the InstancedMesh is created.
-   * It iterates over all groups and writes:
-   *   - a world-space transformation matrix (position only, no rotation/scale) per instance
-   *   - a uniform purple color for every instance via setColorAt
-   */
-  const setup = (mesh: InstancedMesh) => {
+  // Runs on mount and whenever filters or positions change. Updates every instance's
+  // matrix (position + scale) and color to reflect the current filter state.
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
     // Reusable dummy Object3D — avoids allocating per-group objects inside the loop.
     const dummy = new Object3D();
-    const col = new Color(GROUP_COLOR);
+    const base = new Color(GROUP_COLOR);
+    // ~8% intensity keeps non-matching nodes barely visible — perceptually near black.
+    const dim = new Color(GROUP_COLOR).multiplyScalar(0.08);
+    const anyActive = isAnyFilterActive(filters);
+
     for (let i = 0; i < groups.length; i++) {
       const pos = positions.get(groups[i].id);
       // Skip any group that the layout function did not assign a position to.
       if (!pos) continue;
+
+      // groupMatches returns true for all groups when no group filter is active.
+      const matches = !anyActive || groupMatches(groups[i], filters);
+
       dummy.position.set(pos.x, pos.y, pos.z);
+      dummy.scale.setScalar(matches ? MATCH_SCALE : NONMATCH_SCALE);
       dummy.updateMatrix();
+
       // Write the 4x4 transformation matrix for this instance slot.
       mesh.setMatrixAt(i, dummy.matrix);
-      // setColorAt is optional on older Three.js builds — guard with optional call.
-      mesh.setColorAt?.(i, col);
+      // Apply full or dimmed color based on match status.
+      mesh.setColorAt?.(i, matches ? base : dim);
     }
-    // Signal Three.js that the instance buffer has been written and needs upload to GPU.
+
+    // Signal Three.js that the instance buffers have been written and need GPU upload.
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  };
+  }, [filters, positions, groups]);
 
   return (
     // instancedMesh args: [geometry, material, count].
     // Passing undefined for geometry/material because they are supplied as child JSX.
-    // onUpdate fires after the mesh is added to the scene, which is the correct time
-    // to write instance matrices (the underlying buffers are allocated by then).
-    <instancedMesh
-      ref={meshRef}
-      args={[undefined, undefined, groups.length]}
-      onUpdate={(m) => setup(m as InstancedMesh)}
-    >
+    <instancedMesh ref={meshRef} args={[undefined, undefined, groups.length]}>
       {/* Octahedron detail=0 gives the classic 8-face diamond shape, cheap to render */}
       <octahedronGeometry args={[GROUP_RADIUS, 0]} />
       {/* meshStandardMaterial responds to scene lighting for depth cues */}

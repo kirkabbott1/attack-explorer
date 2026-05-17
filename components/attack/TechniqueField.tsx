@@ -5,13 +5,18 @@
 // so the GPU only needs one draw call per type rather than one draw call per individual node.
 // This is critical for performance because ATT&CK v17 has ~700+ techniques and 400+ sub-techniques.
 //
-// Positions are set once at mount via the onUpdate callback (which fires after the mesh is
-// placed in the scene). The layout is deterministic (computed once by lib/attack/layout.ts)
-// so per-frame position updates are not needed.
+// Filter-aware rendering: when filters are active, non-matching nodes are dimmed to ~8% brightness
+// (near-black) rather than made transparent. Three.js InstancedMesh does not support per-instance
+// opacity, so we encode the "dim" state by scaling the base color toward black via multiplyScalar.
+// Matching nodes are also scaled up slightly (MATCH_SCALE) to visually pop against the dim field.
+//
+// The useEffect runs on mount AND on every filter/position change — this replaces the old
+// onUpdate-only approach and ensures the scene updates reactively when filters change.
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { InstancedMesh, Object3D, Color } from 'three';
-import { useGraph, usePositions } from '@/lib/attack/context';
+import { useGraph, usePositions, useFilters } from '@/lib/attack/context';
+import { isAnyFilterActive, techniqueMatches } from '@/lib/attack/filter';
 
 // Teal/cyan palette — parent techniques are brighter, sub-techniques are darker.
 const TECHNIQUE_COLOR = '#9bfffd';
@@ -21,18 +26,25 @@ const SUBTECHNIQUE_COLOR = '#15d6d2';
 const TECHNIQUE_RADIUS = 1.5;
 const SUBTECHNIQUE_RADIUS = 0.8;
 
+// Scale factors: matching nodes scale up slightly when filters are active to draw the eye.
+const MATCH_SCALE = 1.2;
+const NONMATCH_SCALE = 1.0;
+
 /**
  * Renders all techniques (parents only) as one InstancedMesh and all sub-techniques as a
  * second InstancedMesh. One draw call per type instead of one per node.
  *
  * Uses useGraph() to access the DataLayer and usePositions() to get the 3D world positions
- * computed by computeLayout() in lib/attack/layout.ts.
+ * computed by computeLayout() in lib/attack/layout.ts. Uses useFilters() to reactively
+ * update node colors and scales whenever the filter state changes.
  */
 export default function TechniqueField() {
-  // DataLayer accessor — provides getAllTechniques() which returns the full flat list.
+  // DataLayer accessor — provides getAllTechniques() and lookup methods for filter evaluation.
   const data = useGraph();
   // Map from node ID (string) to Vec3 { x, y, z } world position.
   const positions = usePositions();
+  // [filters, setFilters] — we only read filters here; setFilters is unused.
+  const [filters] = useFilters();
 
   // Fetch the full technique list once. getAllTechniques() returns a stable reference
   // from the DataLayer which is itself memoized on graph identity in the provider.
@@ -44,53 +56,58 @@ export default function TechniqueField() {
   const subs = useMemo(() => allTechniques.filter(t => t.isSubtechnique), [allTechniques]);
 
   // Refs to the InstancedMesh objects so we can call setMatrixAt / setColorAt
-  // imperatively after they mount, without triggering React re-renders.
+  // imperatively in the effect, without triggering React re-renders.
   const parentMeshRef = useRef<InstancedMesh>(null!);
   const subMeshRef = useRef<InstancedMesh>(null!);
 
-  /**
-   * Sets the per-instance transform matrix and color for each item in the instanced mesh.
-   *
-   * Called via the onUpdate prop after the mesh is added to the scene. We use a dummy
-   * Object3D to build the matrix (position only — no rotation or scale changes needed).
-   *
-   * @param mesh - The InstancedMesh to configure (may be null before mount).
-   * @param items - The subset of Technique objects assigned to this mesh.
-   * @param color - Hex color string applied uniformly to every instance in this mesh.
-   */
-  const setupInstances = (
-    mesh: InstancedMesh | null,
-    items: typeof parents,
-    color: string
-  ) => {
-    if (!mesh) return;
-    // Reusable Object3D used only to compute the transformation matrix per instance.
-    const dummy = new Object3D();
-    // Color is the same for all instances in a given mesh, so we create it once outside the loop.
-    const col = new Color(color);
+  // Mount-time + filter-change combined update. Three.js InstancedMesh doesn't directly
+  // support per-instance opacity, so we encode the "dim" state as a color scaled toward
+  // black. Layout stays stable; only color and scale change when filters update.
+  useEffect(() => {
+    /**
+     * Updates all instances in a given mesh to reflect the current filter state.
+     * Matching nodes get full base color + MATCH_SCALE; non-matching get dim color + NONMATCH_SCALE.
+     *
+     * @param mesh         - The InstancedMesh to update (may be null before mount).
+     * @param items        - The subset of Technique objects assigned to this mesh.
+     * @param baseColorHex - Full-brightness hex color for matching instances.
+     */
+    const update = (mesh: InstancedMesh | null, items: typeof parents, baseColorHex: string) => {
+      if (!mesh) return;
+      const dummy = new Object3D();
+      const base = new Color(baseColorHex);
+      // ~8% intensity keeps non-matching nodes barely visible — perceptually near black.
+      const dim = new Color(baseColorHex).multiplyScalar(0.08);
+      const anyActive = isAnyFilterActive(filters);
 
-    for (let i = 0; i < items.length; i++) {
-      // Look up the 3D position assigned by the layout algorithm for this technique id.
-      const pos = positions.get(items[i].id);
-      // Skip instances whose positions have not been computed (should not happen in practice
-      // with a fully initialised layout, but we guard defensively).
-      if (!pos) continue;
+      for (let i = 0; i < items.length; i++) {
+        // Look up the 3D position assigned by the layout algorithm for this technique id.
+        const pos = positions.get(items[i].id);
+        // Skip instances whose positions have not been computed (defensive guard).
+        if (!pos) continue;
 
-      // Apply position to the dummy and recompute its world matrix.
-      dummy.position.set(pos.x, pos.y, pos.z);
-      dummy.updateMatrix();
+        // Determine whether this technique passes all active filter dimensions.
+        const matches = !anyActive || techniqueMatches(items[i], filters, data);
 
-      // Write the per-instance transform into the instanced mesh's internal buffer.
-      mesh.setMatrixAt(i, dummy.matrix);
-      // setColorAt is optional (mesh.instanceColor may be null before first call) — use
-      // optional chaining to avoid a crash if the geometry does not support per-instance color.
-      mesh.setColorAt?.(i, col);
-    }
+        // Apply position and scale to the dummy, then compute its matrix.
+        dummy.position.set(pos.x, pos.y, pos.z);
+        dummy.scale.setScalar(matches ? MATCH_SCALE : NONMATCH_SCALE);
+        dummy.updateMatrix();
 
-    // Signal Three.js that the internal buffers are dirty and need to be uploaded to the GPU.
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  };
+        // Write the per-instance transform into the instanced mesh's internal buffer.
+        mesh.setMatrixAt(i, dummy.matrix);
+        // Apply full or dimmed color based on match status.
+        mesh.setColorAt?.(i, matches ? base : dim);
+      }
+
+      // Signal Three.js that the internal buffers are dirty and need GPU upload.
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    };
+
+    update(parentMeshRef.current, parents, TECHNIQUE_COLOR);
+    update(subMeshRef.current, subs, SUBTECHNIQUE_COLOR);
+  }, [filters, positions, parents, subs, data]);
 
   return (
     <group>
@@ -98,13 +115,8 @@ export default function TechniqueField() {
         Parent technique instances.
         args = [geometry, material, count] — passing undefined for geometry and material
         because they are defined via child JSX (<sphereGeometry> and <meshStandardMaterial>).
-        onUpdate fires after R3F attaches this mesh to the scene, giving us a valid ref.
       */}
-      <instancedMesh
-        ref={parentMeshRef}
-        args={[undefined, undefined, parents.length]}
-        onUpdate={(m) => setupInstances(m as InstancedMesh, parents, TECHNIQUE_COLOR)}
-      >
+      <instancedMesh ref={parentMeshRef} args={[undefined, undefined, parents.length]}>
         {/* Higher segment counts (12x12) keep parent spheres smooth at their larger radius. */}
         <sphereGeometry args={[TECHNIQUE_RADIUS, 12, 12]} />
         <meshStandardMaterial color={TECHNIQUE_COLOR} />
@@ -115,11 +127,7 @@ export default function TechniqueField() {
         Smaller radius and slightly lower segment count (10x10) — still smooth at this size,
         and slightly cheaper to rasterise given the larger quantity of sub-technique nodes.
       */}
-      <instancedMesh
-        ref={subMeshRef}
-        args={[undefined, undefined, subs.length]}
-        onUpdate={(m) => setupInstances(m as InstancedMesh, subs, SUBTECHNIQUE_COLOR)}
-      >
+      <instancedMesh ref={subMeshRef} args={[undefined, undefined, subs.length]}>
         <sphereGeometry args={[SUBTECHNIQUE_RADIUS, 10, 10]} />
         <meshStandardMaterial color={SUBTECHNIQUE_COLOR} />
       </instancedMesh>
