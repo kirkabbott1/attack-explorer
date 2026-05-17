@@ -1,0 +1,55 @@
+name: Refresh ATT&CK Data
+
+on:
+  schedule:
+    # First day of every month at 06:00 UTC
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch latest ATT&CK data
+        run: npm run fetch-attack-data
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet public/data/; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No data changes; nothing to PR."
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            VERSION=$(node -p "require('./public/data/attack-graph.json').version")
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Open PR with refreshed data
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: refresh ATT&CK data to v${{ steps.changes.outputs.version }}"
+          title: "chore: refresh ATT&CK data to v${{ steps.changes.outputs.version }}"
+          body: |
+            Automated monthly refresh of the MITRE ATT&CK data snapshot used by the explorer.
+
+            New version: **v${{ steps.changes.outputs.version }}**
+
+            Review the diff to confirm no breaking shape changes, then merge to deploy.
+          branch: chore/refresh-attack-data
+          delete-branch: true
