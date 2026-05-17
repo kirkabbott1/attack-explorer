@@ -4,7 +4,7 @@
 // the subscene components. Additional subscenes (groups, software, edges)
 // will be added incrementally as Phase 3 of the plan lands.
 //
-// Currently renders: tactics row + technique/sub-technique instanced meshes.
+// Currently renders: tactics row + technique/sub-technique instanced meshes + groups + software.
 
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -14,6 +14,9 @@ import TacticsRow from './TacticsRow';
 import TechniqueField from './TechniqueField';
 // GroupConstellation renders all threat groups as instanced octahedrons in the back-plane.
 import GroupConstellation from './GroupConstellation';
+// SoftwareConstellation renders malware as orange cubes and tools as yellow tetrahedrons,
+// both positioned in the deepest back-plane via two separate InstancedMesh draw calls.
+import SoftwareConstellation from './SoftwareConstellation';
 
 /**
  * Top-level R3F canvas for the ATT&CK Explorer. Hosts camera, lights, orbit controls,
@@ -45,6 +48,8 @@ export default function Scene() {
       <TechniqueField />
       {/* GroupConstellation: renders all threat groups as instanced octahedrons in the back-plane */}
       <GroupConstellation />
+      {/* SoftwareConstellation: renders malware (orange cubes) and tools (yellow tetrahedrons) */}
+      <SoftwareConstellation />
     </Canvas>
   );
 }
