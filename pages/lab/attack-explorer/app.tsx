@@ -140,7 +140,8 @@ export default function AttackExplorerApp() {
       <Head>
         <title>ATT&amp;CK 3D Explorer</title>
         <meta name="description" content="Interactive 3D explorer of MITRE ATT&CK Enterprise." />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
         {/* Remove default body margin/padding and prevent scrollbars on the 3D canvas page. */}
         <style>{`html, body { margin: 0; padding: 0; overflow: hidden; }`}</style>
       </Head>
