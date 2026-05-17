@@ -17,6 +17,9 @@ import GroupConstellation from './GroupConstellation';
 // SoftwareConstellation renders malware as orange cubes and tools as yellow tetrahedrons,
 // both positioned in the deepest back-plane via two separate InstancedMesh draw calls.
 import SoftwareConstellation from './SoftwareConstellation';
+// Edges renders line segments connecting the focused node to its direct relationships.
+// Only visible when a node is selected — keeps the scene uncluttered by default.
+import Edges from './Edges';
 
 /**
  * Top-level R3F canvas for the ATT&CK Explorer. Hosts camera, lights, orbit controls,
@@ -50,6 +53,9 @@ export default function Scene() {
       <GroupConstellation />
       {/* SoftwareConstellation: renders malware (orange cubes) and tools (yellow tetrahedrons) */}
       <SoftwareConstellation />
+      {/* Edges: renders line segments from focused node to its direct relationships.
+          Renders nothing when nothing is selected. */}
+      <Edges />
     </Canvas>
   );
 }
