@@ -15,7 +15,10 @@
 
 import { useMemo, useRef, useEffect } from 'react';
 import { InstancedMesh, Object3D, Color } from 'three';
-import { useGraph, usePositions, useFilters } from '@/lib/attack/context';
+// ThreeEvent is the R3F wrapper around native pointer/mouse events.
+// It adds scene-graph context (instanceId, object, intersections, etc.) to the raw DOM event.
+import { type ThreeEvent } from '@react-three/fiber';
+import { useGraph, usePositions, useFilters, useHover, useSelection } from '@/lib/attack/context';
 import { isAnyFilterActive, techniqueMatches } from '@/lib/attack/filter';
 
 // Teal/cyan palette — parent techniques are brighter, sub-techniques are darker.
@@ -45,6 +48,10 @@ export default function TechniqueField() {
   const positions = usePositions();
   // [filters, setFilters] — we only read filters here; setFilters is unused.
   const [filters] = useFilters();
+  // [hoveredId, setHover] — we only write setHover here.
+  const [, setHover] = useHover();
+  // [focusId, setSelection] — we only write setSelection here.
+  const [, setSelection] = useSelection();
 
   // Fetch the full technique list once. getAllTechniques() returns a stable reference
   // from the DataLayer which is itself memoized on graph identity in the provider.
@@ -109,14 +116,63 @@ export default function TechniqueField() {
     update(subMeshRef.current, subs, SUBTECHNIQUE_COLOR);
   }, [filters, positions, parents, subs, data]);
 
+  // --- Pointer event handlers for parent technique instances ---
+  // e.instanceId is the integer slot index in the InstancedMesh buffer — maps directly
+  // to the index in the `parents` array since they share the same ordering.
+
+  /** Set hover to the parent technique under the pointer. stopPropagation prevents
+   *  the event from bubbling to the sub-technique mesh or the canvas background. */
+  const onParentOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    const id = parents[e.instanceId!]?.id;
+    if (id) setHover(id);
+  };
+
+  /** Clear hover when the pointer leaves any parent technique instance. */
+  const onParentOut = () => setHover(null);
+
+  /** Set the selected (focused) node to the clicked parent technique. */
+  const onParentClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const id = parents[e.instanceId!]?.id;
+    if (id) setSelection(id);
+  };
+
+  // --- Pointer event handlers for sub-technique instances ---
+  // Same logic, but indexing into the `subs` array instead.
+
+  /** Set hover to the sub-technique under the pointer. */
+  const onSubOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    const id = subs[e.instanceId!]?.id;
+    if (id) setHover(id);
+  };
+
+  /** Clear hover when the pointer leaves any sub-technique instance. */
+  const onSubOut = () => setHover(null);
+
+  /** Set the selected (focused) node to the clicked sub-technique. */
+  const onSubClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const id = subs[e.instanceId!]?.id;
+    if (id) setSelection(id);
+  };
+
   return (
     <group>
       {/*
         Parent technique instances.
         args = [geometry, material, count] — passing undefined for geometry and material
         because they are defined via child JSX (<sphereGeometry> and <meshStandardMaterial>).
+        Pointer handlers enable hover tooltip and click-to-select.
       */}
-      <instancedMesh ref={parentMeshRef} args={[undefined, undefined, parents.length]}>
+      <instancedMesh
+        ref={parentMeshRef}
+        args={[undefined, undefined, parents.length]}
+        onPointerOver={onParentOver}
+        onPointerOut={onParentOut}
+        onClick={onParentClick}
+      >
         {/* Higher segment counts (12x12) keep parent spheres smooth at their larger radius. */}
         <sphereGeometry args={[TECHNIQUE_RADIUS, 12, 12]} />
         <meshStandardMaterial color={TECHNIQUE_COLOR} />
@@ -126,8 +182,15 @@ export default function TechniqueField() {
         Sub-technique instances.
         Smaller radius and slightly lower segment count (10x10) — still smooth at this size,
         and slightly cheaper to rasterise given the larger quantity of sub-technique nodes.
+        Pointer handlers enable hover tooltip and click-to-select.
       */}
-      <instancedMesh ref={subMeshRef} args={[undefined, undefined, subs.length]}>
+      <instancedMesh
+        ref={subMeshRef}
+        args={[undefined, undefined, subs.length]}
+        onPointerOver={onSubOver}
+        onPointerOut={onSubOut}
+        onClick={onSubClick}
+      >
         <sphereGeometry args={[SUBTECHNIQUE_RADIUS, 10, 10]} />
         <meshStandardMaterial color={SUBTECHNIQUE_COLOR} />
       </instancedMesh>

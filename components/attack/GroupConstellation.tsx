@@ -13,7 +13,9 @@
 
 import { useRef, useEffect } from 'react';
 import { InstancedMesh, Object3D, Color } from 'three';
-import { useGraph, usePositions, useFilters } from '@/lib/attack/context';
+// ThreeEvent is the R3F wrapper around native pointer/mouse events with scene-graph context.
+import { type ThreeEvent } from '@react-three/fiber';
+import { useGraph, usePositions, useFilters, useHover, useSelection } from '@/lib/attack/context';
 import { isAnyFilterActive, groupMatches } from '@/lib/attack/filter';
 
 // Light purple differentiates groups from teal techniques and orange/yellow software.
@@ -40,6 +42,10 @@ export default function GroupConstellation() {
   const positions = usePositions();
   // [filters, setFilters] — we only read filters here.
   const [filters] = useFilters();
+  // [hoveredId, setHover] — we only write setHover here.
+  const [, setHover] = useHover();
+  // [focusId, setSelection] — we only write setSelection here.
+  const [, setSelection] = useSelection();
 
   const groups = data.getAllGroups();
 
@@ -82,10 +88,38 @@ export default function GroupConstellation() {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [filters, positions, groups]);
 
+  // --- Pointer event handlers for group instances ---
+  // e.instanceId is the integer slot index in the InstancedMesh buffer — maps directly
+  // to the index in the `groups` array since they share the same ordering.
+
+  /** Set hover to the group node under the pointer. stopPropagation prevents bubbling. */
+  const onGroupOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    const id = groups[e.instanceId!]?.id;
+    if (id) setHover(id);
+  };
+
+  /** Clear hover when the pointer leaves any group instance. */
+  const onGroupOut = () => setHover(null);
+
+  /** Set the selected (focused) node to the clicked group. */
+  const onGroupClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const id = groups[e.instanceId!]?.id;
+    if (id) setSelection(id);
+  };
+
   return (
     // instancedMesh args: [geometry, material, count].
     // Passing undefined for geometry/material because they are supplied as child JSX.
-    <instancedMesh ref={meshRef} args={[undefined, undefined, groups.length]}>
+    // Pointer handlers enable hover tooltip and click-to-select.
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, groups.length]}
+      onPointerOver={onGroupOver}
+      onPointerOut={onGroupOut}
+      onClick={onGroupClick}
+    >
       {/* Octahedron detail=0 gives the classic 8-face diamond shape, cheap to render */}
       <octahedronGeometry args={[GROUP_RADIUS, 0]} />
       {/* meshStandardMaterial responds to scene lighting for depth cues */}

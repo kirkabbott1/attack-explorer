@@ -14,7 +14,9 @@
 
 import { useRef, useEffect } from 'react';
 import { InstancedMesh, Object3D, Color } from 'three';
-import { useGraph, usePositions, useFilters } from '@/lib/attack/context';
+// ThreeEvent is the R3F wrapper around native pointer/mouse events with scene-graph context.
+import { type ThreeEvent } from '@react-three/fiber';
+import { useGraph, usePositions, useFilters, useHover, useSelection } from '@/lib/attack/context';
 import { isAnyFilterActive, softwareMatches } from '@/lib/attack/filter';
 
 // Orange distinguishes malware from purple groups and teal techniques.
@@ -44,6 +46,10 @@ export default function SoftwareConstellation() {
   const positions = usePositions();
   // [filters, setFilters] — we only read filters here.
   const [filters] = useFilters();
+  // [hoveredId, setHover] — we only write setHover here.
+  const [, setHover] = useHover();
+  // [focusId, setSelection] — we only write setSelection here.
+  const [, setSelection] = useSelection();
 
   // Split all software into malware and tools for separate instanced meshes.
   const all = data.getAllSoftware();
@@ -100,18 +106,73 @@ export default function SoftwareConstellation() {
     update(toolMeshRef.current, tools, TOOL_COLOR);
   }, [filters, positions, malware, tools]);
 
+  // --- Pointer event handlers for malware instances ---
+  // e.instanceId is the integer slot index in the InstancedMesh buffer — maps directly
+  // to the index in the `malware` array since they share the same ordering.
+
+  /** Set hover to the malware node under the pointer. stopPropagation prevents bubbling. */
+  const onMalwareOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    const id = malware[e.instanceId!]?.id;
+    if (id) setHover(id);
+  };
+
+  /** Clear hover when the pointer leaves any malware instance. */
+  const onMalwareOut = () => setHover(null);
+
+  /** Set the selected (focused) node to the clicked malware entry. */
+  const onMalwareClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const id = malware[e.instanceId!]?.id;
+    if (id) setSelection(id);
+  };
+
+  // --- Pointer event handlers for tool instances ---
+  // Same pattern, but indexing into the `tools` array.
+
+  /** Set hover to the tool node under the pointer. */
+  const onToolOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    const id = tools[e.instanceId!]?.id;
+    if (id) setHover(id);
+  };
+
+  /** Clear hover when the pointer leaves any tool instance. */
+  const onToolOut = () => setHover(null);
+
+  /** Set the selected (focused) node to the clicked tool entry. */
+  const onToolClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const id = tools[e.instanceId!]?.id;
+    if (id) setSelection(id);
+  };
+
   return (
     <group>
-      {/* Malware: box (cube) geometry — one draw call for all malware instances */}
-      <instancedMesh ref={malwareMeshRef} args={[undefined, undefined, malware.length]}>
+      {/* Malware: box (cube) geometry — one draw call for all malware instances.
+          Pointer handlers enable hover tooltip and click-to-select. */}
+      <instancedMesh
+        ref={malwareMeshRef}
+        args={[undefined, undefined, malware.length]}
+        onPointerOver={onMalwareOver}
+        onPointerOut={onMalwareOut}
+        onClick={onMalwareClick}
+      >
         {/* Box with equal sides so it reads as a cube at any viewing angle */}
         <boxGeometry args={[SOFTWARE_SIZE, SOFTWARE_SIZE, SOFTWARE_SIZE]} />
         {/* meshStandardMaterial responds to scene lighting for consistent depth cues */}
         <meshStandardMaterial color={MALWARE_COLOR} />
       </instancedMesh>
 
-      {/* Tools: tetrahedron geometry — one draw call for all tool instances */}
-      <instancedMesh ref={toolMeshRef} args={[undefined, undefined, tools.length]}>
+      {/* Tools: tetrahedron geometry — one draw call for all tool instances.
+          Pointer handlers enable hover tooltip and click-to-select. */}
+      <instancedMesh
+        ref={toolMeshRef}
+        args={[undefined, undefined, tools.length]}
+        onPointerOver={onToolOver}
+        onPointerOut={onToolOut}
+        onClick={onToolClick}
+      >
         {/* Tetrahedron detail=0 gives the minimal 4-face pyramid, cheap and distinctive */}
         <tetrahedronGeometry args={[SOFTWARE_SIZE * 1.1, 0]} />
         <meshStandardMaterial color={TOOL_COLOR} />

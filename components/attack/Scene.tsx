@@ -20,6 +20,9 @@ import SoftwareConstellation from './SoftwareConstellation';
 // Edges renders line segments connecting the focused node to its direct relationships.
 // Only visible when a node is selected — keeps the scene uncluttered by default.
 import Edges from './Edges';
+// HoverTooltip renders a single floating HTML label next to whichever node is hovered.
+// One instance handles all node types — it reads hoveredId from context and repositions itself.
+import HoverTooltip from './HoverTooltip';
 
 /**
  * Top-level R3F canvas for the ATT&CK Explorer. Hosts camera, lights, orbit controls,
@@ -56,6 +59,9 @@ export default function Scene() {
       {/* Edges: renders line segments from focused node to its direct relationships.
           Renders nothing when nothing is selected. */}
       <Edges />
+      {/* HoverTooltip: floats a DOM label above the hovered node. One instance covers
+          all node types — it returns null when nothing is hovered. */}
+      <HoverTooltip />
     </Canvas>
   );
 }
