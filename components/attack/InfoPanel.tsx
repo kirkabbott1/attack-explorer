@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useGraph } from '@/lib/attack/context';
 
 /**
  * InfoPanel: bottom-left overlay on the 3D canvas.
@@ -88,6 +89,9 @@ function ShapeIcon({ shape, color }: { shape: LegendItem['shape']; color: string
 export default function InfoPanel() {
   // Controls whether the "Controls & shortcuts" section is visible below the legend.
   const [expanded, setExpanded] = useState(false);
+  // Read the ATT&CK data version (sourced from MITRE's x_mitre_version) so viewers
+  // can confirm what corpus they're looking at. Updated by the monthly GitHub Action.
+  const data = useGraph();
 
   return (
     <div
@@ -107,11 +111,16 @@ export default function InfoPanel() {
         ))}
       </ul>
 
+      {/* ATT&CK version stamp — always visible so viewers know the data is current */}
+      <div className="mt-3 pt-2 border-t border-darkteal/30 text-[11px] text-lightteal/50">
+        ATT&amp;CK Enterprise v{data.version}
+      </div>
+
       {/* Toggle button — collapses or expands the controls section below */}
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
-        className="mt-3 text-medteal hover:text-lightteal text-xs block"
+        className="mt-2 text-medteal hover:text-lightteal text-xs block"
       >
         {/* Use HTML entities for arrows to avoid Windows charmap encoding issues */}
         {expanded ? 'Hide controls ↑' : 'Controls & shortcuts ↓'}
