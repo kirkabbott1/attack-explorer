@@ -9,7 +9,6 @@
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { Perf } from 'r3f-perf';
-import { useRouter } from 'next/router';
 import TacticsRow from './TacticsRow';
 // TechniqueField renders all parent techniques and sub-techniques as two InstancedMesh
 // objects (one draw call per type) for GPU-efficient rendering of 1000+ nodes.
@@ -41,8 +40,8 @@ import ShiftPanModifier from './ShiftPanModifier';
  * Supports ?debug=1 query parameter to render r3f-perf performance overlay.
  */
 export default function Scene() {
-  const router = useRouter();
-  const debug = router.query.debug === '1';
+  // Read the ?debug=1 flag (toggles the r3f-perf overlay) from the URL.
+  const debug = new URLSearchParams(window.location.search).get('debug') === '1';
 
   return (
     // Canvas: creates the WebGL renderer and R3F scene graph.
