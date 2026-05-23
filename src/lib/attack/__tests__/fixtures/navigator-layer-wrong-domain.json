@@ -1,0 +1,6 @@
+{
+  "name": "Wrong Domain",
+  "domain": "mobile-attack",
+  "versions": { "attack": "17", "navigator": "5.1.0", "layer": "4.5" },
+  "techniques": []
+}
