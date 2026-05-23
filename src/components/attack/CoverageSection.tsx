@@ -109,7 +109,11 @@ export default function CoverageSection() {
   return (
     <div className="border-b border-darkteal/20 py-3 px-4">
       <div className="flex w-full items-center justify-between text-sm font-semibold text-medteal">
-        {/* Visible heading — uppercase chip-style label matching FilterSection style. */}
+        {/* sr-only h3 gives screen readers a landmark heading for this section,
+            matching the pattern used by FilterSection. The visible label is a
+            plain <span> so getByRole('heading') queries remain unambiguous. */}
+        <h3 className="sr-only">Coverage Layer</h3>
+        {/* Visible label — uppercase chip-style matching FilterSection style. */}
         <span className="uppercase tracking-wider">Coverage Layer</span>
       </div>
 
