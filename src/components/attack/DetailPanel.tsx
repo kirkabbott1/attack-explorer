@@ -3,7 +3,7 @@
 // selected - the AppShell collapses the right column to 0 width in that case.
 // useGraph provides O(1) data access; useSelection reads/writes the focus id.
 
-import { useGraph, useSelection } from '@/lib/attack/context';
+import { useGraph, useSelection, useCoverage } from '@/lib/attack/context';
 
 // Base URL for outbound links back to the live MITRE ATT&CK website.
 const MITRE_BASE = 'https://attack.mitre.org';
@@ -16,6 +16,8 @@ export default function DetailPanel() {
   // Pull the DataLayer (all accessor methods) and the current selection from context.
   const data = useGraph();
   const [focusId, setSelection] = useSelection();
+  // Read the imported Navigator layer state for displaying per-technique coverage data.
+  const [coverage] = useCoverage();
 
   // Nothing selected - render nothing so AppShell can collapse the column.
   if (!focusId) return null;
@@ -55,6 +57,10 @@ export default function DetailPanel() {
         {subs.length > 0 && <RelatedLinkSection title={`Sub-techniques (${subs.length})`} items={subs} onPick={setSelection} />}
         {groups.length > 0 && <RelatedLinkSection title={`Used by groups (${groups.length})`} items={groups} onPick={setSelection} />}
         {sw.length > 0 && <RelatedLinkSection title={`Implemented in software (${sw.length})`} items={sw} onPick={setSelection} />}
+        <CoverageLayerInfo
+          layerName={coverage.layer?.name ?? null}
+          entry={coverage.byTechniqueId.get(technique.id) ?? null}
+        />
         <MitreLink href={`${MITRE_BASE}${mitrePath}`} />
       </div>
     );
@@ -206,5 +212,48 @@ function MitreLink({ href }: { href: string }) {
     >
       Open on attack.mitre.org &rarr;
     </a>
+  );
+}
+
+/**
+ * Coverage-layer subsection: shows the imported layer's score and comment for
+ * the focused technique. Renders nothing when no layer is loaded. Renders a
+ * "not in this layer" line when a layer is loaded but the technique is absent.
+ */
+function CoverageLayerInfo({
+  layerName,
+  entry,
+}: {
+  layerName: string | null;
+  entry: { score?: number; color?: string; comment?: string; enabled: boolean } | null;
+}) {
+  // No layer loaded - suppress the section entirely.
+  if (layerName === null) return null;
+
+  return (
+    <div className="mt-4 pt-3 border-t border-darkteal/30">
+      <div className="text-xs uppercase tracking-wider text-lightteal/50">
+        Coverage layer
+      </div>
+      {/* Display the layer name below the section heading */}
+      <div className="text-xs text-lightteal/50 mb-1">{layerName}</div>
+      {entry === null ? (
+        // Technique exists in the graph but is absent from the imported layer.
+        <div className="text-sm text-lightteal/70">Not in this layer</div>
+      ) : (
+        <>
+          {/* Show numeric score when the layer entry carries one */}
+          {entry.score !== undefined && (
+            <div className="text-sm text-lightteal/90">Score: {entry.score}</div>
+          )}
+          {/* Show analyst comment when present; whitespace-pre-line preserves line breaks */}
+          {entry.comment && (
+            <div className="text-sm text-lightteal/80 whitespace-pre-line">
+              {entry.comment}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
