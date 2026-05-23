@@ -6,6 +6,13 @@ import { createContext, useContext, useState, useEffect, useMemo, type ReactNode
 import { createDataLayer, type DataLayer } from './data';
 import { computeLayout } from './layout';
 import { EMPTY_FILTERS, type GraphData, type SearchIndex, type FilterState, type Vec3 } from './types';
+import {
+  buildCoverageIndex,
+  loadPersisted,
+  savePersisted,
+  clearPersisted,
+} from './coverage';
+import { EMPTY_COVERAGE, type CoverageState } from './types';
 
 // --- Context shape ---
 // All fields the context exposes to consumers. Null default forces the context
@@ -23,6 +30,9 @@ interface AttackContextValue {
   // ID of the node currently under the pointer, or null.
   hoveredId: string | null;
   setHoveredId: (id: string | null) => void;
+  // Navigator-layer coverage state — layer, per-technique index, and view toggle.
+  coverage: CoverageState;
+  setCoverage: (next: CoverageState) => void;
 }
 
 // Use null as the default so useCtx can detect "provider missing" at runtime.
@@ -62,6 +72,30 @@ export function AttackProvider({
   const [focusId, setFocusId] = useState<string | null>(initialFocusId);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+  // Hydrate coverage from localStorage on mount; the index is rebuilt from the
+  // current graph so technique IDs that vanished between sessions are dropped.
+  const [coverage, setCoverage] = useState<CoverageState>(() => {
+    const persisted = loadPersisted();
+    if (!persisted) return EMPTY_COVERAGE;
+    const graphTechniqueIds = new Set(graph.techniques.map(t => t.id));
+    const byTechniqueId = buildCoverageIndex(persisted.layer, graphTechniqueIds);
+    return {
+      layer: persisted.layer,
+      byTechniqueId,
+      viewActive: persisted.viewActive,
+      warnings: [],
+    };
+  });
+
+  // Persist on every change. Clearing (layer === null) removes the storage key.
+  useEffect(() => {
+    if (coverage.layer === null) {
+      clearPersisted();
+      return;
+    }
+    savePersisted({ layer: coverage.layer, viewActive: coverage.viewActive });
+  }, [coverage]);
+
   // Notify the parent page whenever filters or focusId change so it can push
   // updates to the URL without the context needing to know about the router.
   useEffect(() => {
@@ -81,6 +115,8 @@ export function AttackProvider({
     setFocusId,
     hoveredId,
     setHoveredId,
+    coverage,
+    setCoverage,
   };
 
   return <AttackContext.Provider value={value}>{children}</AttackContext.Provider>;
@@ -135,4 +171,10 @@ export function useSelection(): [string | null, (id: string | null) => void] {
 export function useHover(): [string | null, (id: string | null) => void] {
   const ctx = useCtx();
   return [ctx.hoveredId, ctx.setHoveredId];
+}
+
+/** Returns [coverage, setCoverage]. Mirrors useFilters / useSelection shape. */
+export function useCoverage(): [CoverageState, (next: CoverageState) => void] {
+  const ctx = useCtx();
+  return [ctx.coverage, ctx.setCoverage];
 }
