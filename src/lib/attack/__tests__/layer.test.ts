@@ -11,6 +11,17 @@ import wrongDomainFixture from './fixtures/navigator-layer-wrong-domain.json';
 // IDs in coverageFixture except T9999 which is intentionally absent.
 const KNOWN_IDS = new Set(['T1059', 'T1059.001', 'T1003', 'T1078']);
 
+// Helper that builds a minimal valid layer payload so individual field variants
+// can be tested without copying the full fixture each time.
+function makeMinimalLayer(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    domain: 'enterprise-attack',
+    versions: { attack: '17', navigator: '5', layer: '4.5' },
+    techniques: [],
+    ...overrides,
+  };
+}
+
 describe('parseNavigatorLayer', () => {
   test('parses a valid layer and indexes by technique id', () => {
     const result = parseNavigatorLayer(coverageFixture, KNOWN_IDS);
@@ -66,6 +77,81 @@ describe('parseNavigatorLayer', () => {
     const t1078 = result.layer!.techniques.find(t => t.techniqueID === 'T1078')!;
     expect(t1078.enabled).toBe(false);
   });
+
+  // Checklist item 1: empty techniques array must be valid and produce no errors.
+  test('accepts an empty techniques array without errors', () => {
+    const result = parseNavigatorLayer(makeMinimalLayer(), new Set());
+    expect(result.errors).toEqual([]);
+    expect(result.layer).not.toBeNull();
+    expect(result.layer!.techniques).toEqual([]);
+  });
+
+  // Checklist item 2: entries with a non-string or missing techniqueID are
+  // silently skipped; the parser must not crash.
+  test('silently skips entries with a numeric techniqueID', () => {
+    const raw = makeMinimalLayer({
+      techniques: [{ techniqueID: 123, score: 50 }],
+    });
+    const result = parseNavigatorLayer(raw, new Set());
+    expect(result.errors).toEqual([]);
+    expect(result.layer!.techniques).toHaveLength(0);
+  });
+
+  test('silently skips entries with techniqueID entirely missing', () => {
+    const raw = makeMinimalLayer({
+      techniques: [{ score: 80 }, { tactic: 'execution', color: '#ff0000' }],
+    });
+    const result = parseNavigatorLayer(raw, new Set());
+    expect(result.errors).toEqual([]);
+    expect(result.layer!.techniques).toHaveLength(0);
+  });
+
+  // Checklist item 3: when both score and color are present, both are preserved
+  // in the parsed output so downstream rendering can decide which takes precedence.
+  test('preserves both score and explicit color when both are present', () => {
+    const raw = makeMinimalLayer({
+      techniques: [{ techniqueID: 'T1059', score: 75, color: '#abcdef' }],
+    });
+    const result = parseNavigatorLayer(raw, new Set(['T1059']));
+    expect(result.errors).toEqual([]);
+    const t = result.layer!.techniques[0];
+    expect(t.score).toBe(75);
+    expect(t.color).toBe('#abcdef');
+  });
+
+  // Checklist item 4: parseGradient (tested via parseNavigatorLayer) must not
+  // crash when the colors array contains non-string values.
+  test('handles gradient with mixed-type color stops — filters non-strings, keeps valid ones', () => {
+    const raw = makeMinimalLayer({
+      gradient: { colors: [null, 'foo', 42], minValue: 0, maxValue: 100 },
+    });
+    const result = parseNavigatorLayer(raw, new Set());
+    expect(result.errors).toEqual([]);
+    // 'foo' is the only string survivor; gradient must be non-null with that color.
+    expect(result.layer!.gradient).not.toBeUndefined();
+    expect(result.layer!.gradient!.colors).toEqual(['foo']);
+  });
+
+  // Checklist item 5: parseGradient returns undefined when colors is empty
+  // (so downstream code uses DEFAULT_GRADIENT).
+  test('treats an empty gradient colors array as no gradient', () => {
+    const raw = makeMinimalLayer({
+      gradient: { colors: [], minValue: 0, maxValue: 100 },
+    });
+    const result = parseNavigatorLayer(raw, new Set());
+    expect(result.errors).toEqual([]);
+    expect(result.layer!.gradient).toBeUndefined();
+  });
+
+  // Checklist item 5 (extended): all non-string values → gradient is also undefined.
+  test('treats gradient with only non-string colors as no gradient', () => {
+    const raw = makeMinimalLayer({
+      gradient: { colors: [null, 42, true], minValue: 0, maxValue: 100 },
+    });
+    const result = parseNavigatorLayer(raw, new Set());
+    expect(result.errors).toEqual([]);
+    expect(result.layer!.gradient).toBeUndefined();
+  });
 });
 
 describe('colorForScore', () => {
@@ -103,6 +189,50 @@ describe('colorForScore', () => {
 
   test('falls back gracefully on a degenerate single-color gradient', () => {
     expect(colorForScore(50, { colors: ['#abcdef'], minValue: 0, maxValue: 100 })).toBe('#abcdef');
+  });
+});
+
+// Checklist item 6: zero-width gradient (minValue === maxValue).
+// The clamp guards (`score <= minValue` and `score >= maxValue`) fire before the
+// division `(score - minValue) / (maxValue - minValue)` is reached, so a NaN
+// result is impossible for any finite score when min === max.
+describe('colorForScore — degenerate zero-width range (minValue === maxValue)', () => {
+  const FLAT = { colors: ['#000000', '#ffffff'], minValue: 50, maxValue: 50 };
+
+  test('score exactly at the degenerate value returns a valid hex string', () => {
+    const c = colorForScore(50, FLAT);
+    // Must be a #rrggbb hex string, not NaN-derived garbage like '#NaNNaNNaN'.
+    expect(c).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  test('score below the degenerate value returns a valid hex string', () => {
+    const c = colorForScore(10, FLAT);
+    expect(c).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  test('score above the degenerate value returns a valid hex string', () => {
+    const c = colorForScore(90, FLAT);
+    expect(c).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+});
+
+// Checklist item 7: negative minValue — interpolation must still be linear.
+describe('colorForScore — negative minValue', () => {
+  // Range -100 to 100: score 0 is exactly the midpoint (t = 0.5).
+  // Midpoint of #000000 and #ffffff is #7f7f7f or #808080.
+  const GNEG = { colors: ['#000000', '#ffffff'], minValue: -100, maxValue: 100 };
+
+  test('score at midpoint of a negative-to-positive range interpolates correctly', () => {
+    const c = colorForScore(0, GNEG).toLowerCase();
+    expect(c).toMatch(/^#7f7f7f|^#808080/);
+  });
+
+  test('score at minValue returns the first color', () => {
+    expect(colorForScore(-100, GNEG).toLowerCase()).toBe('#000000');
+  });
+
+  test('score at maxValue returns the last color', () => {
+    expect(colorForScore(100, GNEG).toLowerCase()).toBe('#ffffff');
   });
 });
 

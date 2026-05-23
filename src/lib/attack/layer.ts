@@ -209,12 +209,21 @@ function parseGradient(raw: unknown): NavigatorGradient | undefined {
  * For an N-stop gradient the range [minValue, maxValue] is divided into N-1
  * equal segments; the score is mapped into the appropriate segment and then
  * linearly interpolated between the two bounding stops.
+ *
+ * Degenerate (zero-width) range: when minValue === maxValue the clamp guards
+ * fire before the division `(score - minValue) / (maxValue - minValue)` is
+ * reached, so a NaN result is impossible for any finite score. Any score <=
+ * minValue returns colors[0] and any score > minValue (i.e. above maxValue)
+ * returns colors[colors.length - 1]. In practice all scores collapse to the
+ * clamped endpoints, which is a safe and deterministic outcome.
  */
 export function colorForScore(score: number, gradient: NavigatorGradient): string {
   const { colors, minValue, maxValue } = gradient;
   if (colors.length === 1) return colors[0];
 
-  // Clamp to the endpoints.
+  // Clamp to the endpoints. These guards also make degenerate (min === max)
+  // ranges safe: the `<=` check always fires first for score === min === max,
+  // and no score can be strictly between two equal bounds.
   if (score <= minValue) return colors[0];
   if (score >= maxValue) return colors[colors.length - 1];
 
@@ -234,6 +243,18 @@ export function colorForScore(score: number, gradient: NavigatorGradient): strin
 /**
  * Linearly interpolate between two #rrggbb hex color strings.
  * t=0 returns a, t=1 returns b.
+ *
+ * IMPORTANT: Both `a` and `b` MUST be exactly 7-character `#rrggbb` strings
+ * (lowercase or uppercase, each channel two hex digits). The Navigator-layer
+ * spec and this codebase use that convention for gradient color stops.
+ *
+ * Shorter forms like CSS 3-char shorthand (#f00) will produce incorrect
+ * channel values because `slice(1,3)` will not capture the intended digits.
+ * 8-char RGBA strings (#rrggbbaa) will silently ignore the alpha channel (the
+ * alpha bytes are never sliced), so only the RGB portion is interpolated.
+ *
+ * If Navigator ever emits non-#rrggbb stops, add a normalization step here
+ * before calling parseInt on the channel slices.
  */
 function mixHex(a: string, b: string, t: number): string {
   const ar = parseInt(a.slice(1, 3), 16);
