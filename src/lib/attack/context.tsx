@@ -5,14 +5,21 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
 import { createDataLayer, type DataLayer } from './data';
 import { computeLayout } from './layout';
-import { EMPTY_FILTERS, type GraphData, type SearchIndex, type FilterState, type Vec3 } from './types';
+import {
+  EMPTY_FILTERS,
+  EMPTY_COVERAGE,
+  type GraphData,
+  type SearchIndex,
+  type FilterState,
+  type Vec3,
+  type CoverageState,
+} from './types';
 import {
   buildCoverageIndex,
   loadPersisted,
   savePersisted,
   clearPersisted,
 } from './coverage';
-import { EMPTY_COVERAGE, type CoverageState } from './types';
 
 // --- Context shape ---
 // All fields the context exposes to consumers. Null default forces the context
