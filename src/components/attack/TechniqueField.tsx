@@ -112,10 +112,27 @@ export default function TechniqueField() {
           instanceColor = dim;
         } else if (overlay) {
           // Coverage overlay is active: color by the layer entry for this technique.
+          //
+          // V1 DECISION — entry.enabled is intentionally NOT checked here.
+          // A technique with enabled:false in the layer still has a meaningful score
+          // or explicit color (otherwise the parser would have skipped the entry).
+          // Dimming it based on enabled would conflict with the filter-dim mechanism
+          // and require a third visual state. The enabled flag is preserved in state
+          // for round-trip re-export fidelity; future work can add a dedicated
+          // "disabled" visual treatment if the use-case arises.
           const entry = coverage.byTechniqueId.get(items[i].id);
           if (entry?.color) {
             // Layer provided an explicit hex color — use it directly.
-            instanceColor = new Color(entry.color);
+            // Defensive: Three.js Color logs a warning and returns white (1,1,1) for
+            // unrecognised color strings rather than throwing, which would silently
+            // paint malformed-layer techniques as bright white instead of the neutral
+            // grey. We catch any rare throw variant and fall back to notInLayer so
+            // the user sees grey (uncovered) rather than a misleading bright node.
+            try {
+              instanceColor = new Color(entry.color);
+            } catch {
+              instanceColor = notInLayer;
+            }
           } else if (entry?.score !== undefined) {
             // Layer provided a numeric score — map through the gradient to get a hex.
             instanceColor = new Color(colorForScore(entry.score, gradient));
@@ -142,6 +159,10 @@ export default function TechniqueField() {
       // Signal Three.js that the internal buffers are dirty and need GPU upload.
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      // PERF NOTE (future): the overlay branches allocate new Color objects per
+      // instance — ~700+ allocations per repaint. For v1 this is acceptable; a
+      // future optimization could pre-allocate a reusable Color and call .set()
+      // instead of constructing, removing GC pressure on coverage repaints.
     };
 
     update(parentMeshRef.current, parents, TECHNIQUE_COLOR);
