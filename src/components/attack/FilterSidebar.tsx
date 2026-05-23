@@ -3,6 +3,7 @@ import { useFilters, useGraph } from '@/lib/attack/context';
 import { EMPTY_FILTERS } from '@/lib/attack/types';
 import FilterSection from './FilterSection';
 import SearchBox from './SearchBox';
+import CoverageSection from './CoverageSection';
 
 // Props accepted by FilterSidebar.
 // searchInputRef is forwarded to SearchBox so the parent can programmatically focus
@@ -108,6 +109,7 @@ export default function FilterSidebar({ searchInputRef }: FilterSidebarProps) {
         selected={filters.software}
         onToggle={(v) => toggle('software', v)}
       />
+      <CoverageSection />
 
       {/* Clear all sits at the bottom of the sidebar, pinned via mt-auto */}
       <div className="px-4 py-4 mt-auto border-t border-darkteal/30">
