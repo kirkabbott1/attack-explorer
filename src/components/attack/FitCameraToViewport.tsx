@@ -68,7 +68,7 @@ export default function FitCameraToViewport() {
     //    position+orientation so future pinch-zoom / orbit moves start from
     //    the correct baseline instead of the stale pre-fit state.
     if (controls) controls.update();
-  }, [camera, size?.width, size?.height, controls]);
+  }, [camera, size.width, size.height, controls]);
 
   return null;
 }

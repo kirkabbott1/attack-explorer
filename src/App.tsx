@@ -3,7 +3,6 @@ import type { GraphData, SearchIndex, FilterState } from '@/lib/attack/types';
 import { AttackProvider, useSelection } from '@/lib/attack/context';
 import { decodeStateFromQuery, encodeStateToQuery } from '@/lib/attack/url';
 import { readQuery, writeQuery } from '@/lib/attack/history';
-import { useIsMobile } from '@/lib/attack/useIsMobile';
 import AppShell from '@/components/attack/AppShell';
 import FilterSidebar from '@/components/attack/FilterSidebar';
 import DetailPanel from '@/components/attack/DetailPanel';
@@ -26,15 +25,16 @@ function ExplorerLayout() {
   // clears the URL query state via the existing onStateChange wiring).
   const [focusId, setSelection] = useSelection();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  // useIsMobile drives the initial value: desktop starts with the sidebar open
-  // (matches prior behaviour), mobile starts with the drawer closed so the
-  // canvas is visible on first load and the user opens the drawer via the
-  // hamburger button. useState's lazy initialiser captures isMobile on first
-  // render only — runtime resizes do not re-flip the value, which is intended:
-  // a user who toggled the panel during a session keeps that state through
-  // orientation changes.
-  const isMobileViewport = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobileViewport);
+  // Desktop starts with the sidebar open (matches prior behaviour); mobile
+  // starts with the drawer closed so the canvas is visible on first load and
+  // the user opens the drawer via the hamburger button. The useState lazy
+  // initialiser reads window.innerWidth once on mount — we don't need a
+  // reactive subscription here because we want the user's later toggles to
+  // persist across orientation changes. AppShell's own useIsMobile call is
+  // the reactive source of truth for which layout tree to render.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === 'undefined' || window.innerWidth >= 768,
+  );
 
   return (
     <>
