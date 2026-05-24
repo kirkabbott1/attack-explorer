@@ -3,6 +3,7 @@ import type { GraphData, SearchIndex, FilterState } from '@/lib/attack/types';
 import { AttackProvider, useSelection } from '@/lib/attack/context';
 import { decodeStateFromQuery, encodeStateToQuery } from '@/lib/attack/url';
 import { readQuery, writeQuery } from '@/lib/attack/history';
+import { useIsMobile } from '@/lib/attack/useIsMobile';
 import AppShell from '@/components/attack/AppShell';
 import FilterSidebar from '@/components/attack/FilterSidebar';
 import DetailPanel from '@/components/attack/DetailPanel';
@@ -20,9 +21,20 @@ const Scene = lazy(() => import('@/components/attack/Scene'));
  * detailPanelOpen is derived from focusId; sidebarOpen is local UI state.
  */
 function ExplorerLayout() {
-  const [focusId] = useSelection();
+  // We now need both focusId AND setSelection so the detail sheet's close
+  // button can clear the selection (which derives detailPanelOpen, and also
+  // clears the URL query state via the existing onStateChange wiring).
+  const [focusId, setSelection] = useSelection();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // useIsMobile drives the initial value: desktop starts with the sidebar open
+  // (matches prior behaviour), mobile starts with the drawer closed so the
+  // canvas is visible on first load and the user opens the drawer via the
+  // hamburger button. useState's lazy initialiser captures isMobile on first
+  // render only — runtime resizes do not re-flip the value, which is intended:
+  // a user who toggled the panel during a session keeps that state through
+  // orientation changes.
+  const isMobileViewport = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobileViewport);
 
   return (
     <>
@@ -44,6 +56,8 @@ function ExplorerLayout() {
         detailPanel={<DetailPanel />}
         detailPanelOpen={focusId !== null}
         sidebarOpen={sidebarOpen}
+        onSidebarOpenChange={setSidebarOpen}
+        onClearSelection={() => setSelection(null)}
       />
     </>
   );
