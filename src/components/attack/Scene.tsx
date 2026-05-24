@@ -30,6 +30,10 @@ import CameraFocus from './CameraFocus';
 // ShiftPanModifier: render-null component that wires Shift+drag as an alternate
 // pan binding by swapping OrbitControls.mouseButtons.LEFT on keydown/keyup.
 import ShiftPanModifier from './ShiftPanModifier';
+// FitCameraToViewport: render-null component that pulls the camera back on
+// narrow (portrait) viewports so the full horizontal extent of the scene fits.
+// No-op on landscape viewports — desktop framing is preserved exactly.
+import FitCameraToViewport from './FitCameraToViewport';
 
 /**
  * Top-level R3F canvas for the ATT&CK Explorer. Hosts camera, lights, orbit controls,
@@ -80,6 +84,10 @@ export default function Scene() {
       {/* ShiftPanModifier: swaps OrbitControls left-drag mode to PAN while Shift is held,
           restores ROTATE on keyup/blur. No visual output — side effects only. */}
       <ShiftPanModifier />
+      {/* FitCameraToViewport: positions the camera Z based on viewport aspect so the full
+          scene fits on portrait phones. No-op on landscape — preserves desktop framing.
+          No visual output — side effects only. */}
+      <FitCameraToViewport />
       {/* Perf: renders performance monitoring overlay in top-right when ?debug=1 is set.
           Uses r3f-perf to display FPS, memory, and render stats. */}
       {debug && <Perf position="top-right" />}

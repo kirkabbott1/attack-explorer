@@ -81,3 +81,34 @@ export interface Vec3 {
 // What a node is in the unified graph — only used for cross-type operations
 // like search results and detail panel relationship traversal.
 export type NodeKind = 'tactic' | 'technique' | 'subtechnique' | 'group' | 'software';
+
+// --- Navigator-layer coverage state ---
+// Filled in by the layer parser; consumed by TechniqueField and DetailPanel.
+// A NavigatorLayer is kept around verbatim for re-export and metadata; the
+// indexed Map gives O(1) per-technique lookup so the Scene does not re-scan
+// the layer's technique array each frame.
+
+export interface CoverageEntry {
+  score?: number;
+  color?: string;
+  comment?: string;
+  enabled: boolean;
+}
+
+export interface CoverageState {
+  /** The imported layer (null when nothing is loaded). */
+  layer: import('./layer').NavigatorLayer | null;
+  /** Per-technique-id index built at import for O(1) Scene lookup. */
+  byTechniqueId: Map<string, CoverageEntry>;
+  /** When true and a layer is loaded, TechniqueField paints the score overlay. */
+  viewActive: boolean;
+  /** Soft parse warnings (e.g. unknown technique IDs). Surfaced in the sidebar. */
+  warnings: string[];
+}
+
+export const EMPTY_COVERAGE: CoverageState = {
+  layer: null,
+  byTechniqueId: new Map(),
+  viewActive: false,
+  warnings: [],
+};

@@ -18,8 +18,9 @@ import { InstancedMesh, Object3D, Color } from 'three';
 // ThreeEvent is the R3F wrapper around native pointer/mouse events.
 // It adds scene-graph context (instanceId, object, intersections, etc.) to the raw DOM event.
 import { type ThreeEvent } from '@react-three/fiber';
-import { useGraph, usePositions, useFilters, useHover, useSelection } from '@/lib/attack/context';
+import { useGraph, usePositions, useFilters, useHover, useSelection, useCoverage } from '@/lib/attack/context';
 import { isAnyFilterActive, techniqueMatches } from '@/lib/attack/filter';
+import { colorForScore, DEFAULT_GRADIENT, NEUTRAL_NOT_IN_LAYER, type NavigatorGradient } from '@/lib/attack/layer';
 
 // Teal/cyan palette — parent techniques are brighter, sub-techniques are darker.
 const TECHNIQUE_COLOR = '#9bfffd';
@@ -52,6 +53,8 @@ export default function TechniqueField() {
   const [, setHover] = useHover();
   // [focusId, setSelection] — we only write setSelection here.
   const [, setSelection] = useSelection();
+  // [coverage, setCoverage] — we only read coverage here to drive per-instance overlay coloring.
+  const [coverage] = useCoverage();
 
   // Fetch the full technique list once. getAllTechniques() returns a stable reference
   // from the DataLayer which is itself memoized on graph identity in the provider.
@@ -85,7 +88,13 @@ export default function TechniqueField() {
       const base = new Color(baseColorHex);
       // ~8% intensity keeps non-matching nodes barely visible — perceptually near black.
       const dim = new Color(baseColorHex).multiplyScalar(0.08);
+      // Color applied to techniques that exist in the graph but are absent from the loaded layer.
+      const notInLayer = new Color(NEUTRAL_NOT_IN_LAYER);
       const anyActive = isAnyFilterActive(filters);
+      // overlay is true when a layer is loaded and the coverage view toggle is enabled.
+      const overlay = coverage.viewActive && coverage.layer !== null;
+      // Use the layer's custom gradient if present, otherwise fall back to the ATT&CK default.
+      const gradient: NavigatorGradient = coverage.layer?.gradient ?? DEFAULT_GRADIENT;
 
       for (let i = 0; i < items.length; i++) {
         // Look up the 3D position assigned by the layout algorithm for this technique id.
@@ -96,6 +105,46 @@ export default function TechniqueField() {
         // Determine whether this technique passes all active filter dimensions.
         const matches = !anyActive || techniqueMatches(items[i], filters, data);
 
+        // Resolve the per-instance color based on filter status and coverage overlay state.
+        let instanceColor: Color;
+        if (!matches) {
+          // Filtered-out nodes stay dim regardless of coverage mode.
+          instanceColor = dim;
+        } else if (overlay) {
+          // Coverage overlay is active: color by the layer entry for this technique.
+          //
+          // V1 DECISION — entry.enabled is intentionally NOT checked here.
+          // A technique with enabled:false in the layer still has a meaningful score
+          // or explicit color (otherwise the parser would have skipped the entry).
+          // Dimming it based on enabled would conflict with the filter-dim mechanism
+          // and require a third visual state. The enabled flag is preserved in state
+          // for round-trip re-export fidelity; future work can add a dedicated
+          // "disabled" visual treatment if the use-case arises.
+          const entry = coverage.byTechniqueId.get(items[i].id);
+          if (entry?.color) {
+            // Layer provided an explicit hex color — use it directly.
+            // Defensive: Three.js Color logs a warning and returns white (1,1,1) for
+            // unrecognised color strings rather than throwing, which would silently
+            // paint malformed-layer techniques as bright white instead of the neutral
+            // grey. We catch any rare throw variant and fall back to notInLayer so
+            // the user sees grey (uncovered) rather than a misleading bright node.
+            try {
+              instanceColor = new Color(entry.color);
+            } catch {
+              instanceColor = notInLayer;
+            }
+          } else if (entry?.score !== undefined) {
+            // Layer provided a numeric score — map through the gradient to get a hex.
+            instanceColor = new Color(colorForScore(entry.score, gradient));
+          } else {
+            // Technique is not referenced in the layer — render as neutral grey.
+            instanceColor = notInLayer;
+          }
+        } else {
+          // No overlay: render with the default teal base color.
+          instanceColor = base;
+        }
+
         // Apply position and scale to the dummy, then compute its matrix.
         dummy.position.set(pos.x, pos.y, pos.z);
         dummy.scale.setScalar(matches ? MATCH_SCALE : NONMATCH_SCALE);
@@ -103,18 +152,22 @@ export default function TechniqueField() {
 
         // Write the per-instance transform into the instanced mesh's internal buffer.
         mesh.setMatrixAt(i, dummy.matrix);
-        // Apply full or dimmed color based on match status.
-        mesh.setColorAt?.(i, matches ? base : dim);
+        // Apply the resolved color for this instance.
+        mesh.setColorAt?.(i, instanceColor);
       }
 
       // Signal Three.js that the internal buffers are dirty and need GPU upload.
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      // PERF NOTE (future): the overlay branches allocate new Color objects per
+      // instance — ~700+ allocations per repaint. For v1 this is acceptable; a
+      // future optimization could pre-allocate a reusable Color and call .set()
+      // instead of constructing, removing GC pressure on coverage repaints.
     };
 
     update(parentMeshRef.current, parents, TECHNIQUE_COLOR);
     update(subMeshRef.current, subs, SUBTECHNIQUE_COLOR);
-  }, [filters, positions, parents, subs, data]);
+  }, [filters, positions, parents, subs, data, coverage]);
 
   // --- Pointer event handlers for parent technique instances ---
   // e.instanceId is the integer slot index in the InstancedMesh buffer — maps directly

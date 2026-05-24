@@ -20,9 +20,21 @@ const Scene = lazy(() => import('@/components/attack/Scene'));
  * detailPanelOpen is derived from focusId; sidebarOpen is local UI state.
  */
 function ExplorerLayout() {
-  const [focusId] = useSelection();
+  // We now need both focusId AND setSelection so the detail sheet's close
+  // button can clear the selection (which derives detailPanelOpen, and also
+  // clears the URL query state via the existing onStateChange wiring).
+  const [focusId, setSelection] = useSelection();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Desktop starts with the sidebar open (matches prior behaviour); mobile
+  // starts with the drawer closed so the canvas is visible on first load and
+  // the user opens the drawer via the hamburger button. The useState lazy
+  // initialiser reads window.innerWidth once on mount — we don't need a
+  // reactive subscription here because we want the user's later toggles to
+  // persist across orientation changes. AppShell's own useIsMobile call is
+  // the reactive source of truth for which layout tree to render.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === 'undefined' || window.innerWidth >= 768,
+  );
 
   return (
     <>
@@ -44,6 +56,8 @@ function ExplorerLayout() {
         detailPanel={<DetailPanel />}
         detailPanelOpen={focusId !== null}
         sidebarOpen={sidebarOpen}
+        onSidebarOpenChange={setSidebarOpen}
+        onClearSelection={() => setSelection(null)}
       />
     </>
   );
