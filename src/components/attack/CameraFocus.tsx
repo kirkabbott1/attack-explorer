@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Vector3 } from 'three';
 import { usePositions, useSelection } from '@/lib/attack/context';
+import { readCameraFitVersion } from '@/lib/attack/cameraCoordinator';
 import type * as THREE from 'three';
 
 // How long the camera tween animation takes in milliseconds.
@@ -40,6 +41,12 @@ export default function CameraFocus() {
   // The destination orbit-controls target position (the selected node's world position).
   const toTarget = useRef<Vector3>(new Vector3());
 
+  // Snapshot of the cameraCoordinator version at the moment the current tween
+  // started. Compared against the live version on every frame so an external
+  // snap (FitCameraToViewport on device rotation) cancels the tween instead
+  // of fighting it frame-by-frame.
+  const fitVersionAtTweenStart = useRef<number>(0);
+
   // When focusId changes, capture the current controls target and set the new destination,
   // then kick off the tween by recording the start timestamp.
   useEffect(() => {
@@ -50,6 +57,9 @@ export default function CameraFocus() {
     fromTarget.current.copy(controls.target);
     // Set destination to the selected node's position.
     toTarget.current.set(p.x, p.y, p.z);
+    // Capture the camera-fit version at tween start so we can detect later
+    // whether a fit happened mid-tween and abort.
+    fitVersionAtTweenStart.current = readCameraFitVersion();
     // Record the tween start time.
     tweenStart.current = performance.now();
   }, [focusId, positions, controls]);
@@ -57,6 +67,14 @@ export default function CameraFocus() {
   // Each frame: advance the tween. Uses a cubic ease-out for a natural deceleration feel.
   useFrame(() => {
     if (tweenStart.current === null || !controls) return;
+
+    // Cancel the tween if a camera fit (viewport snap) happened since the
+    // tween started. Without this, the per-frame lerp below would overwrite
+    // the fit on every frame, producing visible camera judder during rotation.
+    if (readCameraFitVersion() !== fitVersionAtTweenStart.current) {
+      tweenStart.current = null;
+      return;
+    }
 
     // t ranges 0 -> 1 over TWEEN_DURATION_MS milliseconds.
     const t = Math.min(1, (performance.now() - tweenStart.current) / TWEEN_DURATION_MS);
