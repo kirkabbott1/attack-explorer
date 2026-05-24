@@ -12,7 +12,7 @@
 // Touch drag-to-dismiss is intentionally out of scope for v1 — see the
 // design spec, "Non-Goals". Future work can wire a touch handler if needed.
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface Props {
   /** When true, the panel is visible (translateX(0)) and interactive. */
@@ -39,11 +39,29 @@ export default function MobileSidebarDrawer({ open, onClose, children }: Props) 
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // Prevent KeyboardShortcuts.tsx and any other window-level Escape listener
+      // from also firing on this keystroke. Without this, KeyboardShortcuts would
+      // also call setSelection(null), silently clearing the user's focused node
+      // whenever they close the drawer with Escape.
+      e.stopImmediatePropagation();
+      onClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
+
+  // Toggle the HTML `inert` attribute imperatively because it is not part of
+  // React 18's typed JSX attributes for all element types. inert removes the
+  // element and its descendants from focus order and pointer interaction —
+  // aria-hidden alone hides from screen readers but does NOT prevent a sighted
+  // keyboard user from tabbing into the off-screen drawer.
+  const asideRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (asideRef.current) {
+      asideRef.current.inert = !open;
+    }
+  }, [open]);
 
   return (
     <>
@@ -62,6 +80,7 @@ export default function MobileSidebarDrawer({ open, onClose, children }: Props) 
           transform animates cleanly on close. aria-hidden flips based on open
           so screen readers skip the content when closed. */}
       <aside
+        ref={asideRef}
         aria-label="Filters and search"
         aria-hidden={!open}
         className={`fixed top-0 left-0 h-full w-[min(85vw,320px)] z-30 bg-darkblue/95 border-r border-darkteal/30 flex flex-col transition-transform duration-200 ${

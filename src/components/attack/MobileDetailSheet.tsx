@@ -11,7 +11,7 @@
 //
 // Touch drag-to-dismiss is intentionally out of scope for v1.
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface Props {
   /** When true, the sheet is visible (translateY(0)) and interactive. */
@@ -34,14 +34,34 @@ export default function MobileDetailSheet({ open, onClose, children }: Props) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // Prevent KeyboardShortcuts.tsx and any other window-level Escape listener
+      // from also firing — without this the global Escape would also call
+      // setSelection(null), which is what THIS sheet's onClose already does,
+      // so we'd double-fire and racy in the rare case onClose is wired to
+      // something different.
+      e.stopImmediatePropagation();
+      onClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
+  // Toggle the HTML `inert` attribute imperatively because it is not part of
+  // React 18's typed JSX attributes for all element types. inert removes the
+  // element and its descendants from focus order and pointer interaction —
+  // aria-hidden alone hides from screen readers but does NOT prevent a sighted
+  // keyboard user from tabbing into the off-screen sheet.
+  const asideRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (asideRef.current) {
+      asideRef.current.inert = !open;
+    }
+  }, [open]);
+
   return (
     <aside
+      ref={asideRef}
       aria-label="Selected node details"
       aria-hidden={!open}
       className={`fixed bottom-0 left-0 right-0 h-[60vh] z-30 bg-darkblue/95 border-t border-darkteal/30 rounded-t-xl flex flex-col transition-transform duration-200 ${
