@@ -3,13 +3,24 @@ import { useThree, useFrame } from '@react-three/fiber';
 import { Vector3 } from 'three';
 import { usePositions, useSelection } from '@/lib/attack/context';
 import { readCameraFitVersion } from '@/lib/attack/cameraCoordinator';
+import { useIsMobile } from '@/lib/attack/useIsMobile';
 import type * as THREE from 'three';
 
 // How long the camera tween animation takes in milliseconds.
 const TWEEN_DURATION_MS = 400;
 
-// Fixed offset from the target node so the camera ends up in front and above it.
-const CAMERA_OFFSET = new Vector3(0, 10, 40);
+// Desktop offset from the orbit target to the camera. The camera sits 10
+// units above and 40 units in front of whatever controls.target points at,
+// so the focused node renders at the camera view-center on desktop.
+const CAMERA_OFFSET_DESKTOP = new Vector3(0, 10, 40);
+
+// On mobile, the bottom sheet covers the lower 60vh of the canvas — viewport
+// center is behind it. We shift the lookAt point 12 world units below the
+// focused node, then raise the camera by the same amount so the node ends up
+// in the upper portion of the visible 40vh strip instead of at viewport
+// center. See the design rationale in fix/mobile-focus-framing-and-hint commit.
+const CAMERA_OFFSET_MOBILE = new Vector3(0, 22, 40);
+const MOBILE_TARGET_Y_OFFSET = 12;
 
 /**
  * When the selected node changes, smoothly animate the camera target to that node's
@@ -32,6 +43,13 @@ export default function CameraFocus() {
   // focusId is the currently selected node id (or null if nothing is selected).
   const [focusId] = useSelection();
 
+  // Picks which target-offset and camera-offset apply this render. We capture
+  // these into the tween destinations at useEffect time so a mid-tween
+  // orientation change does not retarget the camera (the cameraCoordinator
+  // version-check already cancels tweens on real fits — see CameraFocus
+  // tween/fit race fix).
+  const isMobile = useIsMobile();
+
   // Timestamp (performance.now()) when the current tween started; null when idle.
   const tweenStart = useRef<number | null>(null);
 
@@ -47,6 +65,11 @@ export default function CameraFocus() {
   // of fighting it frame-by-frame.
   const fitVersionAtTweenStart = useRef<number>(0);
 
+  // Snapshot of which camera offset to use across the lifetime of the current
+  // tween. Captured at useEffect time so a mid-tween viewport resize (which
+  // would flip isMobile) doesn't change the camera trajectory mid-flight.
+  const offsetForTween = useRef<Vector3>(CAMERA_OFFSET_DESKTOP);
+
   // When focusId changes, capture the current controls target and set the new destination,
   // then kick off the tween by recording the start timestamp.
   useEffect(() => {
@@ -55,14 +78,20 @@ export default function CameraFocus() {
     if (!p) return;
     // Capture current camera target as the start of the tween.
     fromTarget.current.copy(controls.target);
-    // Set destination to the selected node's position.
-    toTarget.current.set(p.x, p.y, p.z);
+    // On mobile, lower the orbit target by MOBILE_TARGET_Y_OFFSET so the focused
+    // node renders above the bottom sheet rather than behind it. On desktop the
+    // target equals the node position exactly.
+    const targetYOffset = isMobile ? MOBILE_TARGET_Y_OFFSET : 0;
+    toTarget.current.set(p.x, p.y - targetYOffset, p.z);
+    // Pick which offset applies based on the live viewport, lock it in for
+    // the lifetime of this tween.
+    offsetForTween.current = isMobile ? CAMERA_OFFSET_MOBILE : CAMERA_OFFSET_DESKTOP;
     // Capture the camera-fit version at tween start so we can detect later
     // whether a fit happened mid-tween and abort.
     fitVersionAtTweenStart.current = readCameraFitVersion();
     // Record the tween start time.
     tweenStart.current = performance.now();
-  }, [focusId, positions, controls]);
+  }, [focusId, positions, controls, isMobile]);
 
   // Each frame: advance the tween. Uses a cubic ease-out for a natural deceleration feel.
   useFrame(() => {
@@ -86,8 +115,8 @@ export default function CameraFocus() {
     controls.target.lerpVectors(fromTarget.current, toTarget.current, eased);
 
     // Lerp the camera position in parallel so it tracks the target with the same offset.
-    const desiredCamPos = toTarget.current.clone().add(CAMERA_OFFSET);
-    const fromCam = fromTarget.current.clone().add(CAMERA_OFFSET);
+    const desiredCamPos = toTarget.current.clone().add(offsetForTween.current);
+    const fromCam = fromTarget.current.clone().add(offsetForTween.current);
     camera.position.lerpVectors(fromCam, desiredCamPos, eased);
 
     // Sync the OrbitControls internal state after we mutate target/position.
