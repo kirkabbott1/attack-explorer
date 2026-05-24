@@ -68,11 +68,6 @@ export default function FitCameraToViewport() {
     //    position+orientation so future pinch-zoom / orbit moves start from
     //    the correct baseline instead of the stale pre-fit state.
     if (controls) controls.update();
-
-    // Temporary diagnostic so we can confirm in the browser console that the
-    // effect actually ran and at what distance. Remove once verified.
-    // eslint-disable-next-line no-console
-    console.log('[FitCameraToViewport] aspect=', aspect.toFixed(2), 'z=', z.toFixed(1));
   }, [camera, size?.width, size?.height, controls]);
 
   return null;
