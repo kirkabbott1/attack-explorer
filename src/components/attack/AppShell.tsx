@@ -19,6 +19,7 @@ import { type ReactNode } from 'react';
 import { useIsMobile } from '@/lib/attack/useIsMobile';
 import MobileSidebarDrawer from './MobileSidebarDrawer';
 import MobileDetailSheet from './MobileDetailSheet';
+import MobileHint from './MobileHint';
 
 interface AppShellProps {
   sidebar: ReactNode;
@@ -79,6 +80,9 @@ export default function AppShell({
             <span aria-hidden="true">&#9776;</span>
             <span>Filters</span>
           </button>
+          {/* MobileHint: one-shot tip pill prompting first-time users to tap a
+              node. Auto-dismisses on first selection and persists in localStorage. */}
+          <MobileHint />
         </main>
         <MobileSidebarDrawer open={sidebarOpen} onClose={() => onSidebarOpenChange(false)}>
           {sidebar}
