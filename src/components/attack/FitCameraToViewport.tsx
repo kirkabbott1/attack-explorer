@@ -64,10 +64,20 @@ export default function FitCameraToViewport() {
     camera.lookAt(0, 0, 0);
     // 3. Update the projection matrix after position changes.
     camera.updateProjectionMatrix();
-    // 4. Sync OrbitControls' internal spherical coords with the new camera
-    //    position+orientation so future pinch-zoom / orbit moves start from
-    //    the correct baseline instead of the stale pre-fit state.
-    if (controls) controls.update();
+    // 4. Reset the orbit target to the scene origin so OrbitControls' internal
+    //    state matches the new camera.lookAt(0,0,0) we just applied. If a user
+    //    had focused a node before rotating their device, CameraFocus would
+    //    have moved controls.target to that node's world position — leaving
+    //    it there after we re-aim the camera at origin produces an inconsistent
+    //    target/camera pair, and the next pinch-zoom or orbit drag snaps the
+    //    camera to an unexpected position.
+    if (controls) {
+      controls.target.set(0, 0, 0);
+      // 5. Sync OrbitControls' internal spherical coords with the new camera
+      //    position+orientation+target so future moves start from the correct
+      //    baseline instead of the stale pre-fit state.
+      controls.update();
+    }
   }, [camera, size.width, size.height, controls]);
 
   return null;
