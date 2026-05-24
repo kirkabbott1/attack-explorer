@@ -21,6 +21,7 @@ import { useEffect, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
 import type * as THREE from 'three';
 import { cameraZForAspect, DEFAULT_FOV } from '@/lib/attack/cameraFit';
+import { markCameraFit } from '@/lib/attack/cameraCoordinator';
 
 /**
  * Adjusts the camera Z based on viewport aspect so the scene fits on narrow
@@ -77,6 +78,11 @@ export default function FitCameraToViewport() {
       //    position+orientation+target so future moves start from the correct
       //    baseline instead of the stale pre-fit state.
       controls.update();
+      // 6. Signal CameraFocus (and any future tween component) that the camera
+      //    was snapped externally. CameraFocus reads this on every useFrame
+      //    and cancels its in-flight tween when it sees the version change —
+      //    without this, the tween's per-frame lerp would overwrite the snap.
+      markCameraFit();
     }
   }, [camera, size.width, size.height, controls]);
 
