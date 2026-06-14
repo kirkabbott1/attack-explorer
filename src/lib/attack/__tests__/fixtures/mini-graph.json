@@ -11,7 +11,9 @@
       "name": "Phishing",
       "tacticIds": ["TA0001"],
       "platforms": ["Linux", "Windows", "macOS"],
-      "isSubtechnique": false
+      "isSubtechnique": false,
+      "mitigationIds": ["M1041"],
+      "dataComponentIds": []
     },
     {
       "id": "T1566.001",
@@ -19,14 +21,18 @@
       "tacticIds": ["TA0001"],
       "platforms": ["Linux", "Windows", "macOS"],
       "parentId": "T1566",
-      "isSubtechnique": true
+      "isSubtechnique": true,
+      "mitigationIds": ["M1041"],
+      "dataComponentIds": ["DS0017-command-execution"]
     },
     {
       "id": "T1059",
       "name": "Command and Scripting Interpreter",
       "tacticIds": ["TA0002"],
       "platforms": ["Linux", "Windows", "macOS"],
-      "isSubtechnique": false
+      "isSubtechnique": false,
+      "mitigationIds": ["M1042"],
+      "dataComponentIds": ["DS0009-process-creation", "DS0017-command-execution"]
     },
     {
       "id": "T1059.001",
@@ -34,14 +40,18 @@
       "tacticIds": ["TA0002"],
       "platforms": ["Windows"],
       "parentId": "T1059",
-      "isSubtechnique": true
+      "isSubtechnique": true,
+      "mitigationIds": ["M1042"],
+      "dataComponentIds": ["DS0009-process-creation"]
     },
     {
       "id": "T1098",
       "name": "Account Manipulation",
       "tacticIds": ["TA0003"],
       "platforms": ["Linux", "Windows", "macOS"],
-      "isSubtechnique": false
+      "isSubtechnique": false,
+      "mitigationIds": [],
+      "dataComponentIds": ["DS0009-process-metadata"]
     }
   ],
   "groups": [
@@ -73,5 +83,18 @@
       "type": "tool",
       "techniqueIds": ["T1059"]
     }
+  ],
+  "mitigations": [
+    { "id": "M1041", "name": "Encrypt Sensitive Information" },
+    { "id": "M1042", "name": "Disable or Remove Feature or Program" }
+  ],
+  "dataSources": [
+    { "id": "DS0009", "name": "Process" },
+    { "id": "DS0017", "name": "Command" }
+  ],
+  "dataComponents": [
+    { "id": "DS0009-process-creation", "name": "Process Creation", "dataSourceId": "DS0009" },
+    { "id": "DS0009-process-metadata", "name": "Process Metadata", "dataSourceId": "DS0009" },
+    { "id": "DS0017-command-execution", "name": "Command Execution", "dataSourceId": "DS0017" }
   ]
 }

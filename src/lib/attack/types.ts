@@ -16,6 +16,10 @@ export interface Technique {
   platforms: string[];   // ["Linux", "Windows", "macOS", "Network", "Containers", ...]
   parentId?: string;     // for sub-techniques: "T1059.001" -> parent "T1059"
   isSubtechnique: boolean;
+  // Techniques that have no mitigations get an empty array, never undefined.
+  mitigationIds: string[];
+  // Techniques that have no data-component detections get an empty array.
+  dataComponentIds: string[];
 }
 
 export interface Group {
@@ -33,12 +37,40 @@ export interface Software {
   techniqueIds: string[];
 }
 
+// A mitigation (STIX course-of-action). Each one names a defensive control
+// that reduces the impact or likelihood of one or more techniques.
+export interface Mitigation {
+  id: string;        // e.g. "M1041"
+  name: string;
+}
+
+// A data source represents a category of telemetry analysts can use to
+// detect a technique (e.g. "Process", "Network Traffic"). Data sources are
+// containers for data components, which are the actual detection signals.
+export interface DataSource {
+  id: string;        // e.g. "DS0009"
+  name: string;
+}
+
+// A data component is a specific detection signal within a data source
+// (e.g. "Process Creation" within "Process"). Data components are what the
+// "detects" relationship connects to techniques.
+export interface DataComponent {
+  id: string;        // e.g. "DS0009-process-creation" -- slug fallback when STIX has no external_id
+  name: string;
+  dataSourceId: string;
+}
+
 export interface GraphData {
   version: string;        // ATT&CK version, e.g., "17.1"
   tactics: Tactic[];
   techniques: Technique[];
   groups: Group[];
   software: Software[];
+  // Top-level entity arrays. Always present (possibly empty) after fetcher v2.
+  mitigations: Mitigation[];
+  dataSources: DataSource[];
+  dataComponents: DataComponent[];
 }
 
 // Search index is a flat list of entries — separate from GraphData to keep the
@@ -112,3 +144,8 @@ export const EMPTY_COVERAGE: CoverageState = {
   viewActive: false,
   warnings: [],
 };
+
+// Map from entity ID to its full description text (citation markers
+// already stripped at build time). Loaded from attack-descriptions.json
+// after first paint. Consumed via useDescription().
+export type DescriptionMap = Record<string, string>;

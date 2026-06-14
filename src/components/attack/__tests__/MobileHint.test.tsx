@@ -17,9 +17,13 @@ const fakeGraph: GraphData = {
   techniques: [{
     id: 'T1059', name: 'PowerShell', isSubtechnique: false,
     tacticIds: ['TA0001'], platforms: [],
+    mitigationIds: [], dataComponentIds: [],
   }],
   groups: [],
   software: [],
+  mitigations: [],
+  dataSources: [],
+  dataComponents: [],
 };
 const fakeIndex: SearchIndex = { entries: [] };
 
