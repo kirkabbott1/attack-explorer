@@ -44,3 +44,24 @@ export function stripCitations(raw: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * Produce a search-index-ready truncation of a raw description: strip
+ * citations, then truncate to ~200 chars at the last word boundary that
+ * lives in the upper half of the window. If no late-enough word boundary
+ * exists, fall back to a hard cut at 200 chars rather than producing a
+ * uselessly short string.
+ *
+ * Length budget of 200 chars chosen to keep attack-index.json under ~70 KB
+ * gzipped while preserving the front-loaded terminology that ATT&CK
+ * descriptions tend to put in the opening sentences.
+ */
+export function truncateForSearch(raw: string): string {
+  const stripped = stripCitations(raw);
+  if (stripped.length <= 200) return stripped;
+  const cut = stripped.slice(0, 200);
+  const lastSpace = cut.lastIndexOf(' ');
+  // Only honour the word boundary if it lives past the midpoint of the cut
+  // window -- otherwise we would discard most of the content.
+  return lastSpace > 100 ? cut.slice(0, lastSpace) : cut;
+}
