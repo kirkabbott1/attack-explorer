@@ -1,7 +1,12 @@
 // Unit tests for the pure helpers in src/lib/attack/fetcher.ts.
 // These run under Jest (jsdom) without any network access.
 
-import { stripCitations, truncateForSearch, deriveDataComponentId } from '../fetcher';
+import {
+  stripCitations,
+  truncateForSearch,
+  deriveDataComponentId,
+  buildMitigationRelationships,
+} from '../fetcher';
 
 describe('lib/attack/fetcher: stripCitations', () => {
   test('removes a single (Citation: X) marker', () => {
@@ -95,5 +100,66 @@ describe('lib/attack/fetcher: deriveDataComponentId', () => {
     };
     expect(deriveDataComponentId(obj as any, 'DS0029'))
       .toBe('DS0029-network-connection-creation');
+  });
+});
+
+describe('lib/attack/fetcher: buildMitigationRelationships', () => {
+  // STIX UUIDs are arbitrary but must match between objects and relationships.
+  const mitigationStixId = 'course-of-action--m1';
+  const technique1StixId = 'attack-pattern--t1';
+  const technique2StixId = 'attack-pattern--t2';
+
+  // Map from STIX UUID to ATT&CK ID -- built by the fetcher's existing
+  // stixIdToAttackId pass; here we pre-build it for the test.
+  const stixIdToAttackId = new Map([
+    [mitigationStixId, 'M1041'],
+    [technique1StixId, 'T1566'],
+    [technique2StixId, 'T1566.001'],
+  ]);
+
+  const relationships: any[] = [
+    {
+      type: 'relationship',
+      relationship_type: 'mitigates',
+      source_ref: mitigationStixId,
+      target_ref: technique1StixId,
+    },
+    {
+      type: 'relationship',
+      relationship_type: 'mitigates',
+      source_ref: mitigationStixId,
+      target_ref: technique2StixId,
+    },
+    // A 'uses' relationship should be ignored by this builder.
+    {
+      type: 'relationship',
+      relationship_type: 'uses',
+      source_ref: 'intrusion-set--g1',
+      target_ref: technique1StixId,
+    },
+  ];
+
+  test('builds techniqueId -> mitigationIds map', () => {
+    const { mitigationIdsByTechnique } = buildMitigationRelationships(relationships, stixIdToAttackId);
+    expect(mitigationIdsByTechnique.get('T1566')).toEqual(['M1041']);
+    expect(mitigationIdsByTechnique.get('T1566.001')).toEqual(['M1041']);
+  });
+
+  test('builds reverse mitigationId -> techniqueIds map', () => {
+    const { techniqueIdsByMitigation } = buildMitigationRelationships(relationships, stixIdToAttackId);
+    expect(techniqueIdsByMitigation.get('M1041')?.sort()).toEqual(['T1566', 'T1566.001']);
+  });
+
+  test('ignores relationships whose source or target ID is unknown', () => {
+    const orphan: any[] = [
+      {
+        type: 'relationship',
+        relationship_type: 'mitigates',
+        source_ref: 'course-of-action--unknown',
+        target_ref: technique1StixId,
+      },
+    ];
+    const { mitigationIdsByTechnique } = buildMitigationRelationships(orphan, stixIdToAttackId);
+    expect(mitigationIdsByTechnique.size).toBe(0);
   });
 });

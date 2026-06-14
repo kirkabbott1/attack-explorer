@@ -93,3 +93,43 @@ export function deriveDataComponentId(obj: StixObject, parentDataSourceId: strin
     .replace(/^-+|-+$/g, '');
   return `${parentDataSourceId}-${slug}`;
 }
+
+/**
+ * Walk a list of STIX relationship objects and collect the mitigates-edge
+ * graph between mitigations and techniques. Returns both the forward map
+ * (technique -> mitigations) and the reverse map (mitigation -> techniques)
+ * because both are needed: the forward map populates technique.mitigationIds
+ * in the graph file, and the reverse map powers
+ * data.getTechniquesForMitigation in the runtime DataLayer.
+ *
+ * Relationships whose source or target STIX UUID does not resolve to an
+ * ATT&CK ID via stixIdToAttackId are silently skipped. This handles the
+ * "object dropped because it was deprecated" case cleanly.
+ */
+export function buildMitigationRelationships(
+  relationships: StixObject[],
+  stixIdToAttackId: Map<string, string>,
+): {
+  mitigationIdsByTechnique: Map<string, string[]>;
+  techniqueIdsByMitigation: Map<string, string[]>;
+} {
+  const mitigationIdsByTechnique = new Map<string, string[]>();
+  const techniqueIdsByMitigation = new Map<string, string[]>();
+
+  for (const rel of relationships) {
+    if (rel.relationship_type !== 'mitigates') continue;
+    const mitigationId = stixIdToAttackId.get(rel.source_ref ?? '');
+    const techniqueId = stixIdToAttackId.get(rel.target_ref ?? '');
+    if (!mitigationId || !techniqueId) continue;
+
+    const forward = mitigationIdsByTechnique.get(techniqueId) ?? [];
+    forward.push(mitigationId);
+    mitigationIdsByTechnique.set(techniqueId, forward);
+
+    const reverse = techniqueIdsByMitigation.get(mitigationId) ?? [];
+    reverse.push(techniqueId);
+    techniqueIdsByMitigation.set(mitigationId, reverse);
+  }
+
+  return { mitigationIdsByTechnique, techniqueIdsByMitigation };
+}
