@@ -26,3 +26,21 @@ export interface StixObject {
   target_ref?: string;
   relationship_type?: string;
 }
+
+/**
+ * Strip MITRE citation markers like (Citation: Source Name) from description
+ * text. Collapses consecutive whitespace into single spaces and trims the
+ * result. Citation markers are emitted by MITRE STIX bundles for inline
+ * source attribution and have no use in our UI.
+ *
+ * Note: the regex matches up to the first ')' inside a marker. Citations
+ * that themselves contain ')' (e.g. nested parens like "(Citation: X (2024))")
+ * will not be fully stripped -- this is a rare edge case in MITRE data and
+ * acceptable for v1.
+ */
+export function stripCitations(raw: string): string {
+  return raw
+    .replace(/\(Citation:[^)]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
