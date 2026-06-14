@@ -6,6 +6,7 @@ import {
   truncateForSearch,
   deriveDataComponentId,
   buildMitigationRelationships,
+  buildDetectionRelationships,
 } from '../fetcher';
 
 describe('lib/attack/fetcher: stripCitations', () => {
@@ -161,5 +162,71 @@ describe('lib/attack/fetcher: buildMitigationRelationships', () => {
     ];
     const { mitigationIdsByTechnique } = buildMitigationRelationships(orphan, stixIdToAttackId);
     expect(mitigationIdsByTechnique.size).toBe(0);
+  });
+});
+
+describe('lib/attack/fetcher: buildDetectionRelationships', () => {
+  const componentStixId = 'x-mitre-data-component--c1';
+  const techniqueStixId = 'attack-pattern--t1';
+
+  // For detections the relationship source uses the STIX UUID of the
+  // data component, NOT the data component's ATT&CK ID. The caller
+  // resolves the UUID to our (possibly synthetic) data component ID.
+  const stixIdToDataComponentId = new Map([
+    [componentStixId, 'DS0009-process-creation'],
+  ]);
+  const stixIdToAttackId = new Map([
+    [techniqueStixId, 'T1059'],
+  ]);
+
+  const relationships: any[] = [
+    {
+      type: 'relationship',
+      relationship_type: 'detects',
+      source_ref: componentStixId,
+      target_ref: techniqueStixId,
+    },
+    // 'uses' should be ignored.
+    {
+      type: 'relationship',
+      relationship_type: 'uses',
+      source_ref: 'intrusion-set--g1',
+      target_ref: techniqueStixId,
+    },
+  ];
+
+  test('builds techniqueId -> dataComponentIds map', () => {
+    const { dataComponentIdsByTechnique } = buildDetectionRelationships(
+      relationships,
+      stixIdToDataComponentId,
+      stixIdToAttackId,
+    );
+    expect(dataComponentIdsByTechnique.get('T1059')).toEqual(['DS0009-process-creation']);
+  });
+
+  test('builds reverse dataComponentId -> techniqueIds map', () => {
+    const { techniqueIdsByDataComponent } = buildDetectionRelationships(
+      relationships,
+      stixIdToDataComponentId,
+      stixIdToAttackId,
+    );
+    expect(techniqueIdsByDataComponent.get('DS0009-process-creation')).toEqual(['T1059']);
+  });
+
+  test('skips relationships whose source data component is unknown', () => {
+    const orphan: any[] = [
+      {
+        type: 'relationship',
+        relationship_type: 'detects',
+        source_ref: 'x-mitre-data-component--unknown',
+        target_ref: techniqueStixId,
+      },
+    ];
+    const { dataComponentIdsByTechnique } = buildDetectionRelationships(
+      orphan,
+      stixIdToDataComponentId,
+      stixIdToAttackId,
+    );
+    expect(dataComponentIdsByTechnique.size).toBe(0);
   });
 });

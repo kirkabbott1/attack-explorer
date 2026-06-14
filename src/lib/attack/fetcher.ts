@@ -133,3 +133,42 @@ export function buildMitigationRelationships(
 
   return { mitigationIdsByTechnique, techniqueIdsByMitigation };
 }
+
+/**
+ * Walk STIX relationships and collect the detects-edge graph between
+ * data components and techniques. Mirrors buildMitigationRelationships
+ * but uses a separate STIX UUID -> data-component-ID lookup because
+ * data components don't always have ATT&CK external_ids and we coin
+ * synthetic IDs for those that don't (see deriveDataComponentId).
+ *
+ * stixIdToDataComponentId: STIX UUID of data component -> our chosen ID
+ * stixIdToAttackId: STIX UUID of attack-pattern -> ATT&CK technique ID
+ */
+export function buildDetectionRelationships(
+  relationships: StixObject[],
+  stixIdToDataComponentId: Map<string, string>,
+  stixIdToAttackId: Map<string, string>,
+): {
+  dataComponentIdsByTechnique: Map<string, string[]>;
+  techniqueIdsByDataComponent: Map<string, string[]>;
+} {
+  const dataComponentIdsByTechnique = new Map<string, string[]>();
+  const techniqueIdsByDataComponent = new Map<string, string[]>();
+
+  for (const rel of relationships) {
+    if (rel.relationship_type !== 'detects') continue;
+    const componentId = stixIdToDataComponentId.get(rel.source_ref ?? '');
+    const techniqueId = stixIdToAttackId.get(rel.target_ref ?? '');
+    if (!componentId || !techniqueId) continue;
+
+    const forward = dataComponentIdsByTechnique.get(techniqueId) ?? [];
+    forward.push(componentId);
+    dataComponentIdsByTechnique.set(techniqueId, forward);
+
+    const reverse = techniqueIdsByDataComponent.get(componentId) ?? [];
+    reverse.push(techniqueId);
+    techniqueIdsByDataComponent.set(componentId, reverse);
+  }
+
+  return { dataComponentIdsByTechnique, techniqueIdsByDataComponent };
+}
