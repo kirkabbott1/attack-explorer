@@ -1,7 +1,7 @@
 // Unit tests for the pure helpers in src/lib/attack/fetcher.ts.
 // These run under Jest (jsdom) without any network access.
 
-import { stripCitations, truncateForSearch } from '../fetcher';
+import { stripCitations, truncateForSearch, deriveDataComponentId } from '../fetcher';
 
 describe('lib/attack/fetcher: stripCitations', () => {
   test('removes a single (Citation: X) marker', () => {
@@ -54,5 +54,46 @@ describe('lib/attack/fetcher: truncateForSearch', () => {
     const noSpaces = 'x'.repeat(300);
     const result = truncateForSearch(noSpaces);
     expect(result).toHaveLength(200);
+  });
+});
+
+describe('lib/attack/fetcher: deriveDataComponentId', () => {
+  test('prefers the STIX external_id when present', () => {
+    const obj = {
+      type: 'x-mitre-data-component',
+      id: 'x-mitre-data-component--abc',
+      name: 'Process Creation',
+      external_references: [{ source_name: 'mitre-attack', external_id: 'DC0001' }],
+    };
+    expect(deriveDataComponentId(obj as any, 'DS0009')).toBe('DC0001');
+  });
+
+  test('falls back to slug derived from parent data source + component name', () => {
+    const obj = {
+      type: 'x-mitre-data-component',
+      id: 'x-mitre-data-component--abc',
+      name: 'Process Creation',
+    };
+    expect(deriveDataComponentId(obj as any, 'DS0009')).toBe('DS0009-process-creation');
+  });
+
+  test('slug lowercases and replaces spaces and slashes', () => {
+    const obj = {
+      type: 'x-mitre-data-component',
+      id: 'x-mitre-data-component--xyz',
+      name: 'OS API Execution / Hook',
+    };
+    expect(deriveDataComponentId(obj as any, 'DS0011'))
+      .toBe('DS0011-os-api-execution-hook');
+  });
+
+  test('strips any character that is not [a-z0-9-]', () => {
+    const obj = {
+      type: 'x-mitre-data-component',
+      id: 'x-mitre-data-component--zzz',
+      name: 'Network "Connection" Creation!',
+    };
+    expect(deriveDataComponentId(obj as any, 'DS0029'))
+      .toBe('DS0029-network-connection-creation');
   });
 });

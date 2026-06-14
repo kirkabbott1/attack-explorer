@@ -65,3 +65,31 @@ export function truncateForSearch(raw: string): string {
   // window -- otherwise we would discard most of the content.
   return lastSpace > 100 ? cut.slice(0, lastSpace) : cut;
 }
+
+/**
+ * Derive a stable, URL-shareable ID for an x-mitre-data-component STIX
+ * object. Prefers the official ATT&CK external_id when MITRE publishes
+ * one (true for newer releases). Falls back to a slug formed from the
+ * parent data source ID plus a lowercased, dash-separated form of the
+ * component's name.
+ *
+ * Stability across data refreshes matters because these IDs end up in
+ * URL query params (?focus=DS0009-process-creation). A name-based slug
+ * stays stable until MITRE renames the component itself, which is rare
+ * and explicit. Index-based schemes ("DS0009.001") would shift every
+ * sibling whenever a new component is added.
+ */
+export function deriveDataComponentId(obj: StixObject, parentDataSourceId: string): string {
+  // Prefer the published external_id when present.
+  const ref = obj.external_references?.find(r => r.source_name === 'mitre-attack');
+  if (ref?.external_id) return ref.external_id;
+
+  // Otherwise slugify the component name and prefix with the parent ID.
+  const slug = (obj.name ?? '')
+    .toLowerCase()
+    // Replace any run of non-alphanumeric characters with a single dash.
+    .replace(/[^a-z0-9]+/g, '-')
+    // Trim leading/trailing dashes left over from punctuation at the edges.
+    .replace(/^-+|-+$/g, '');
+  return `${parentDataSourceId}-${slug}`;
+}
